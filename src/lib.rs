@@ -1,10 +1,14 @@
+use pnet::{
+    packet::{icmpv6::echo_request::EchoRequestPacket, ip::IpNextHeaderProtocols::Icmpv6},
+    transport::{transport_channel, TransportChannelType, TransportReceiver, TransportSender},
+};
 use rand::Rng;
-use socket2::{Domain, Protocol, Socket, Type};
 use std::net::Ipv6Addr;
 
 #[derive(Debug)]
 pub enum IcmPongError {
     CreateSocketError(std::io::Error),
+    SendPacketError(std::io::Error),
 }
 
 pub enum IcmPongPacketType {
@@ -12,28 +16,47 @@ pub enum IcmPongPacketType {
     Pong,
 }
 
-pub struct IcmPongPacket {
+pub struct IcmPongPacket<'a> {
     version: u64,
     session_id: u64,
     packet_type: IcmPongPacketType,
+    packet_data: &'a [u8; 32],
 }
 
 pub struct IcmPongConnection {
     pub peer: Ipv6Addr,
-    socket: Socket,
+    tx: TransportSender,
+    rx: TransportReceiver,
     session_id: u64,
 }
 
 impl IcmPongConnection {
     pub fn new(peer: Ipv6Addr) -> Result<Self, IcmPongError> {
-        let socket = match Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::ICMPV6)) {
-            Ok(socket) => socket,
+        let (mut tx, mut rx) = match transport_channel(
+            1500,
+            TransportChannelType::Layer4(pnet::transport::TransportProtocol::Ipv6(Icmpv6)),
+        ) {
+            Ok((tx, rx)) => (tx, rx),
             Err(error) => return Err(IcmPongError::CreateSocketError(error)),
         };
         Ok(Self {
             peer,
-            socket,
+            tx,
+            rx,
             session_id: rand::thread_rng().gen(),
         })
+    }
+
+    pub fn send_packet(
+        &mut self,
+        packet_type: IcmPongPacketType,
+        packet_data: &[u8; 32],
+    ) -> Result<(), IcmPongError> {
+        let packet_payload = &["ICMPong".as_bytes(), packet_data].concat();
+        let icmp_packet = EchoRequestPacket::new(&packet_payload).unwrap();
+        match self.tx.send_to(icmp_packet, self.peer.into()) {
+            Ok(_) => Ok(()),
+            Err(error) => Err(IcmPongError::SendPacketError(error)),
+        }
     }
 }

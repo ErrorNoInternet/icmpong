@@ -1,7 +1,5 @@
-pub mod lib;
-
 use clap::Parser;
-use lib::IcmPongConnection;
+use icmpong::{IcmPongConnection, IcmPongPacketType};
 use std::{net::Ipv6Addr, str::FromStr};
 
 #[derive(Parser)]
@@ -22,7 +20,7 @@ fn main() {
             return;
         }
     };
-    let connection = match IcmPongConnection::new(ipv6_address) {
+    let mut connection = match IcmPongConnection::new(ipv6_address) {
         Ok(connection) => connection,
         Err(error) => {
             eprintln!("unable to create IPv6 socket: {error:?}");
