@@ -11,11 +11,11 @@ pub struct IcmPongPacket {
 }
 
 pub struct IcmPongConnection {
-    pub remote: Ipv6Addr,
+    pub peer: Ipv6Addr,
 }
 
 impl IcmPongConnection {
-    pub fn new(remote: Ipv6Addr) -> Self {
-        Self { remote }
+    pub fn new(peer: Ipv6Addr) -> Self {
+        Self { peer }
     }
 }
