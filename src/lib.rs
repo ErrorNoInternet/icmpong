@@ -17,8 +17,8 @@ pub enum IcmPongPacketType {
 }
 
 pub struct IcmPongPacket<'a> {
-    version: u64,
-    session_id: u64,
+    version: u8,
+    session_id: u16,
     packet_type: IcmPongPacketType,
     packet_data: &'a [u8; 32],
 }
@@ -26,13 +26,13 @@ pub struct IcmPongPacket<'a> {
 pub struct IcmPongConnection {
     pub peer: Ipv6Addr,
     tx: TransportSender,
-    rx: TransportReceiver,
+    pub rx: TransportReceiver,
     session_id: u64,
 }
 
 impl IcmPongConnection {
     pub fn new(peer: Ipv6Addr) -> Result<Self, IcmPongError> {
-        let (mut tx, mut rx) = match transport_channel(
+        let (tx, rx) = match transport_channel(
             1500,
             TransportChannelType::Layer4(pnet::transport::TransportProtocol::Ipv6(Icmpv6)),
         ) {
@@ -52,7 +52,12 @@ impl IcmPongConnection {
         packet_type: IcmPongPacketType,
         packet_data: &[u8; 32],
     ) -> Result<(), IcmPongError> {
-        let packet_payload = &["ICMPong".as_bytes(), packet_data].concat();
+        let packet_payload = &[
+            "ICMPong".as_bytes(),
+            &(packet_type as u8).to_ne_bytes()[..],
+            packet_data,
+        ]
+        .concat();
         let icmp_packet = EchoRequestPacket::new(&packet_payload).unwrap();
         match self.tx.send_to(icmp_packet, self.peer.into()) {
             Ok(_) => Ok(()),
