@@ -17,10 +17,9 @@ pub enum IcmPongPacketType {
 }
 
 pub struct IcmPongPacket<'a> {
-    version: u8,
-    session_id: u16,
-    packet_type: IcmPongPacketType,
-    packet_data: &'a [u8; 32],
+    pub version: u8,
+    pub packet_type: IcmPongPacketType,
+    pub packet_data: &'a [u8; 32],
 }
 
 pub struct IcmPongConnection {
@@ -47,15 +46,13 @@ impl IcmPongConnection {
         })
     }
 
-    pub fn send_packet(
-        &mut self,
-        packet_type: IcmPongPacketType,
-        packet_data: &[u8; 32],
-    ) -> Result<(), IcmPongError> {
+    pub fn send_packet(&mut self, packet: IcmPongPacket) -> Result<(), IcmPongError> {
         let packet_payload = &[
             "ICMPong".as_bytes(),
-            &(packet_type as u8).to_ne_bytes()[..],
-            packet_data,
+            &packet.version.to_ne_bytes(),
+            &self.session_id.to_ne_bytes(),
+            &(packet.packet_type as u8).to_ne_bytes(),
+            packet.packet_data,
         ]
         .concat();
         let icmp_packet = EchoRequestPacket::new(&packet_payload).unwrap();
