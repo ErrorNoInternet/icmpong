@@ -1,9 +1,9 @@
-pub const XMIN: u16 = 0;
-pub const YMIN: u16 = 0;
-pub const XMAX: u16 = 89;
-pub const YMAX: u16 = 24;
+pub const X_MINIMUM: u16 = 0;
+pub const Y_MINIMUM: u16 = 0;
+pub const X_MAXIMUM: u16 = 89;
+pub const Y_MAXIMUM: u16 = 24;
 pub const GAME_TICK_MILLIS: u64 = 10;
-pub const FIELD_SIZE: u16 = XMAX * YMAX;
+pub const FIELD_SIZE: u16 = X_MAXIMUM * Y_MAXIMUM;
 pub const PIXEL_EMPTY: u8 = b' ';
 
 pub struct GameObject {
@@ -54,15 +54,15 @@ impl Field {
     }
     pub fn clear(self: &mut Self) {
         for i in 0..self.field_data.len() {
-            let x: u16 = i as u16 % XMAX;
-            let y: u16 = i as u16 / XMAX;
+            let x: u16 = i as u16 % X_MAXIMUM;
+            let y: u16 = i as u16 / X_MAXIMUM;
             let c: u8;
 
-            if y == YMIN || y == YMAX - 1 {
+            if y == Y_MINIMUM || y == Y_MAXIMUM - 1 {
                 c = b'-';
-            } else if x == (XMAX - XMIN) / 2 {
+            } else if x == (X_MAXIMUM - X_MINIMUM) / 2 {
                 c = b'\'';
-            } else if x == XMIN || x == XMAX - 1 {
+            } else if x == X_MINIMUM || x == X_MAXIMUM - 1 {
                 c = b'|';
             } else {
                 c = PIXEL_EMPTY;
@@ -73,7 +73,7 @@ impl Field {
     }
 
     pub fn get_idx(self: &Self, x: &u16, y: &u16) -> usize {
-        (x + y * XMAX) as usize
+        (x + y * X_MAXIMUM) as usize
     }
 
     pub fn draw(self: &mut Self, game: &GameObject) {

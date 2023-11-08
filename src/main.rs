@@ -1,6 +1,6 @@
 mod tui;
 
-use crate::tui::{Field, GameObject, GAME_TICK_MILLIS, XMAX, XMIN, YMAX, YMIN};
+use crate::tui::{Field, GameObject, GAME_TICK_MILLIS, X_MAXIMUM, X_MINIMUM, Y_MAXIMUM, Y_MINIMUM};
 use clap::Parser;
 use crossterm::event::{poll, Event, KeyCode};
 use crossterm::style::{Color, Print, SetBackgroundColor, SetForegroundColor};
@@ -75,7 +75,12 @@ fn main() -> anyhow::Result<()> {
     let connection_established = Arc::new(Mutex::new(false));
     let peer_client_id = Arc::new(Mutex::new(None));
     let peer_start_game = Arc::new(Mutex::new(false));
-    let ball = Arc::new(Mutex::new(GameObject::new(XMAX / 2, YMAX / 2, 1, b'O')));
+    let ball = Arc::new(Mutex::new(GameObject::new(
+        X_MAXIMUM / 2,
+        Y_MAXIMUM / 2,
+        1,
+        b'O',
+    )));
     let peer_player = Arc::new(Mutex::new(None));
     let peer_name = Arc::new(Mutex::new(None));
     let score = Arc::new(Mutex::new([0, 0]));
@@ -110,14 +115,14 @@ fn main() -> anyhow::Result<()> {
     let self_is_host =
         connection.lock().unwrap().client_id > peer_client_id.lock().unwrap().unwrap();
     let player1 = Arc::new(Mutex::new(GameObject::new(
-        XMIN + 3,
-        (YMAX - YMIN) / 2 - 1,
+        X_MINIMUM + 3,
+        (Y_MAXIMUM - Y_MINIMUM) / 2 - 1,
         4,
         b'X',
     )));
     let player2 = Arc::new(Mutex::new(GameObject::new(
-        XMAX - 4,
-        (YMAX - YMIN) / 2 - 1,
+        X_MAXIMUM - 4,
+        (Y_MAXIMUM - Y_MINIMUM) / 2 - 1,
         4,
         b'X',
     )));
@@ -185,7 +190,7 @@ fn main() -> anyhow::Result<()> {
             if self_start_game {
                 if event == Event::Key(KeyCode::Up.into()) {
                     if self_is_host {
-                        if player1.lock().unwrap().get_ymin() > YMIN + 1 {
+                        if player1.lock().unwrap().get_ymin() > Y_MINIMUM + 1 {
                             player1.lock().unwrap().y_position -= 1;
                             let mut data = [0; 32];
                             data[0..2]
@@ -205,7 +210,7 @@ fn main() -> anyhow::Result<()> {
                             };
                         }
                     } else {
-                        if player2.lock().unwrap().get_ymin() > YMIN + 1 {
+                        if player2.lock().unwrap().get_ymin() > Y_MINIMUM + 1 {
                             player2.lock().unwrap().y_position -= 1;
                             let mut data = [0; 32];
                             data[0..2]
@@ -229,7 +234,7 @@ fn main() -> anyhow::Result<()> {
 
                 if event == Event::Key(KeyCode::Down.into()) {
                     if self_is_host {
-                        if player1.lock().unwrap().get_ymax() < YMAX - 1 {
+                        if player1.lock().unwrap().get_ymax() < Y_MAXIMUM - 1 {
                             player1.lock().unwrap().y_position += 1;
                             let mut data = [0; 32];
                             data[0..2]
@@ -249,7 +254,7 @@ fn main() -> anyhow::Result<()> {
                             };
                         }
                     } else {
-                        if player2.lock().unwrap().get_ymax() < YMAX - 1 {
+                        if player2.lock().unwrap().get_ymax() < Y_MAXIMUM - 1 {
                             player2.lock().unwrap().y_position += 1;
                             let mut data = [0; 32];
                             data[0..2]
@@ -283,13 +288,15 @@ fn main() -> anyhow::Result<()> {
             ball.lock().unwrap().x_position = xf32 as u16;
             ball.lock().unwrap().y_position = yf32 as u16;
 
-            if ball.lock().unwrap().x_position >= XMAX {
+            if ball.lock().unwrap().x_position >= X_MAXIMUM {
                 round_winner = 1;
             }
-            if ball.lock().unwrap().x_position <= XMIN {
+            if ball.lock().unwrap().x_position <= X_MINIMUM {
                 round_winner = 2;
             }
-            if ball.lock().unwrap().get_ymin() <= YMIN || ball.lock().unwrap().get_ymax() >= YMAX {
+            if ball.lock().unwrap().get_ymin() <= Y_MINIMUM
+                || ball.lock().unwrap().get_ymax() >= Y_MAXIMUM
+            {
                 bounces += 1;
                 ball.lock().unwrap().y_movement *= -1.0;
                 if self_is_host {
@@ -328,9 +335,9 @@ fn main() -> anyhow::Result<()> {
                 }
             }
 
-            if ball.lock().unwrap().yf32 > YMAX as f32 {
-                ball.lock().unwrap().yf32 = YMAX as f32 - 1.0;
-                ball.lock().unwrap().y_position = YMAX - 1;
+            if ball.lock().unwrap().yf32 > Y_MAXIMUM as f32 {
+                ball.lock().unwrap().yf32 = Y_MAXIMUM as f32 - 1.0;
+                ball.lock().unwrap().y_position = Y_MAXIMUM - 1;
                 if self_is_host {
                     match synchronize_ball(&connection, &ball) {
                         Ok(_) => (),
@@ -349,20 +356,20 @@ fn main() -> anyhow::Result<()> {
             field.clear();
 
             field.write(
-                XMAX / 2 - 5,
-                YMIN,
+                X_MAXIMUM / 2 - 5,
+                Y_MINIMUM,
                 format!(" {:02} ", score.lock().unwrap()[0]).as_str(),
             );
             field.write(
-                XMAX / 2 + 2,
-                YMIN,
+                X_MAXIMUM / 2 + 2,
+                Y_MINIMUM,
                 format!(" {:02} ", score.lock().unwrap()[1]).as_str(),
             );
             if let Some(ref name) = arguments.name {
-                field.write(XMIN, YMIN, &name);
+                field.write(X_MINIMUM, Y_MINIMUM, &name);
             }
             if let Some(peer_name) = peer_name.lock().unwrap().to_owned() {
-                field.write(XMAX - peer_name.len() as u16, YMIN, &peer_name);
+                field.write(X_MAXIMUM - peer_name.len() as u16, Y_MINIMUM, &peer_name);
             }
 
             field.draw(&ball.lock().unwrap());
@@ -372,10 +379,18 @@ fn main() -> anyhow::Result<()> {
             if !game_started {
                 if !self_start_game {
                     let message = "Press SPACE to start the game!";
-                    field.write(XMAX / 2 - message.len() as u16 / 2, YMAX - 4, message)
+                    field.write(
+                        X_MAXIMUM / 2 - message.len() as u16 / 2,
+                        Y_MAXIMUM - 4,
+                        message,
+                    )
                 } else if !*peer_start_game.lock().unwrap() {
                     let message = "Waiting for peer to press SPACE...";
-                    field.write(XMAX / 2 - message.len() as u16 / 2, YMAX - 4, message)
+                    field.write(
+                        X_MAXIMUM / 2 - message.len() as u16 / 2,
+                        Y_MAXIMUM - 4,
+                        message,
+                    )
                 } else {
                     game_started = true;
                     if self_is_host {
@@ -398,8 +413,8 @@ fn main() -> anyhow::Result<()> {
         }
 
         for i in 0..field.field_data.len() {
-            let x: u16 = i as u16 % XMAX;
-            let y: u16 = i as u16 / XMAX;
+            let x: u16 = i as u16 % X_MAXIMUM;
+            let y: u16 = i as u16 / X_MAXIMUM;
             let c: char = field.field_data[i] as char;
 
             stdout()
@@ -411,7 +426,7 @@ fn main() -> anyhow::Result<()> {
         if round_winner > 0 {
             score.lock().unwrap()[round_winner - 1] += 1;
             round_winner = 0;
-            *ball.lock().unwrap() = GameObject::new(XMAX / 2, YMAX / 2, 1, b'O');
+            *ball.lock().unwrap() = GameObject::new(X_MAXIMUM / 2, Y_MAXIMUM / 2, 1, b'O');
             if self_is_host {
                 bounces = 0;
                 let mut data = [0; 32];
