@@ -105,7 +105,6 @@ fn main() -> anyhow::Result<()> {
 
     let mut self_start_game = false;
     let mut game_started = false;
-    let mut ball_launched = false;
     let mut ball_moving = false;
     let mut update_screen;
     let mut tick_counter: usize = 0;
@@ -144,21 +143,6 @@ fn main() -> anyhow::Result<()> {
                     .unwrap()
                     .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[69; 32]));
                 break 'game_loop;
-            }
-
-            if game_started {
-                if !ball_launched {
-                    ball_launched = true;
-                    if ball_moving {
-                        ball_moving = false;
-                        ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
-                    } else {
-                        ball_moving = true;
-                        let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                        ball.xmov = random_angle.cos() * ball_velocity;
-                        ball.ymov = random_angle.sin() * ball_velocity;
-                    }
-                }
             }
 
             if event == Event::Key(KeyCode::Char(' ').into()) {
@@ -311,6 +295,15 @@ fn main() -> anyhow::Result<()> {
                     field.write(XMAX / 2 - message.len() as u16 / 2, YMAX - 4, message)
                 } else {
                     game_started = true;
+                    if ball_moving {
+                        ball_moving = false;
+                        ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
+                    } else {
+                        ball_moving = true;
+                        let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                        ball.xmov = random_angle.cos() * ball_velocity;
+                        ball.ymov = random_angle.sin() * ball_velocity;
+                    }
                 }
             }
         }
