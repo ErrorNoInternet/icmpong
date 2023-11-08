@@ -13,8 +13,6 @@ use std::io::stdout;
 use std::sync::{Arc, Mutex};
 use std::{io::Write, net::Ipv6Addr, str::FromStr, time::Duration};
 
-const BALL_VELOCITY: f32 = 0.5;
-
 /// The classic game of Pong, in your terminal, over ICMPv6!
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -26,6 +24,10 @@ struct Arguments {
     /// The name you want the other person to see
     #[arg(short, long)]
     name: Option<String>,
+
+    /// The initial ball velocity (will slowly increase after each bounce)
+    #[arg(short, long, default_value_t = 0.4)]
+    ball_velocity: f32,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -378,8 +380,10 @@ fn main() -> anyhow::Result<()> {
                     game_started = true;
                     if self_is_host {
                         let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                        ball.lock().unwrap().x_movement = random_angle.cos() * BALL_VELOCITY;
-                        ball.lock().unwrap().y_movement = random_angle.sin() * BALL_VELOCITY;
+                        ball.lock().unwrap().x_movement =
+                            random_angle.cos() * arguments.ball_velocity;
+                        ball.lock().unwrap().y_movement =
+                            random_angle.sin() * arguments.ball_velocity;
                         match synchronize_ball(&connection, &ball) {
                             Ok(_) => (),
                             Err(error) => {
@@ -427,8 +431,8 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                ball.lock().unwrap().x_movement = random_angle.cos() * BALL_VELOCITY;
-                ball.lock().unwrap().y_movement = random_angle.sin() * BALL_VELOCITY;
+                ball.lock().unwrap().x_movement = random_angle.cos() * arguments.ball_velocity;
+                ball.lock().unwrap().y_movement = random_angle.sin() * arguments.ball_velocity;
                 match synchronize_ball(&connection, &ball) {
                     Ok(_) => (),
                     Err(error) => {
