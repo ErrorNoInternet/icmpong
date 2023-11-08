@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     match connection
         .lock()
         .unwrap()
-        .send_packet(IcmPongPacket::new(IcmPongPacketType::Ping, &[69; 32]))
+        .send_packet(IcmPongPacket::new(IcmPongPacketType::Ping, &[0; 32]))
     {
         Ok(_) => (),
         Err(error) => {
@@ -143,7 +143,7 @@ fn main() -> anyhow::Result<()> {
                 let _ = connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[69; 32]));
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[0; 32]));
                 break 'game_loop;
             }
 
@@ -151,7 +151,7 @@ fn main() -> anyhow::Result<()> {
                 match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Start, &[69; 32]))
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Start, &[0; 32]))
                 {
                     Ok(_) => (),
                     Err(error) => {
@@ -168,7 +168,7 @@ fn main() -> anyhow::Result<()> {
                     if self_is_host {
                         if player1.lock().unwrap().get_ymin() > YMIN + 1 {
                             player1.lock().unwrap().y_position -= 1;
-                            let mut data = [69; 32];
+                            let mut data = [0; 32];
                             data[0..2]
                                 .copy_from_slice(&player1.lock().unwrap().x_position.to_ne_bytes());
                             data[2..4]
@@ -188,7 +188,7 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         if player2.lock().unwrap().get_ymin() > YMIN + 1 {
                             player2.lock().unwrap().y_position -= 1;
-                            let mut data = [69; 32];
+                            let mut data = [0; 32];
                             data[0..2]
                                 .copy_from_slice(&player2.lock().unwrap().x_position.to_ne_bytes());
                             data[2..4]
@@ -212,7 +212,7 @@ fn main() -> anyhow::Result<()> {
                     if self_is_host {
                         if player1.lock().unwrap().get_ymax() < YMAX - 1 {
                             player1.lock().unwrap().y_position += 1;
-                            let mut data = [69; 32];
+                            let mut data = [0; 32];
                             data[0..2]
                                 .copy_from_slice(&player1.lock().unwrap().x_position.to_ne_bytes());
                             data[2..4]
@@ -232,7 +232,7 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         if player2.lock().unwrap().get_ymax() < YMAX - 1 {
                             player2.lock().unwrap().y_position += 1;
-                            let mut data = [69; 32];
+                            let mut data = [0; 32];
                             data[0..2]
                                 .copy_from_slice(&player2.lock().unwrap().x_position.to_ne_bytes());
                             data[2..4]
@@ -387,7 +387,7 @@ fn main() -> anyhow::Result<()> {
             *ball.lock().unwrap() = GameObject::new(XMAX / 2, YMAX / 2, 1, b'O');
             if self_is_host {
                 bounces = 0;
-                let mut data = [69; 32];
+                let mut data = [0; 32];
                 data[0..4].copy_from_slice(&score.lock().unwrap()[0].to_ne_bytes());
                 data[4..8].copy_from_slice(&score.lock().unwrap()[1].to_ne_bytes());
                 match connection
@@ -427,7 +427,7 @@ fn synchronize_ball(
     connection: &Arc<Mutex<IcmPongConnection>>,
     ball: &Arc<Mutex<GameObject>>,
 ) -> Result<(), IcmPongError> {
-    let mut data = [69; 32];
+    let mut data = [0; 32];
     data[0..2].copy_from_slice(&ball.lock().unwrap().x_position.to_ne_bytes());
     data[2..4].copy_from_slice(&ball.lock().unwrap().y_position.to_ne_bytes());
     data[4..8].copy_from_slice(&ball.lock().unwrap().x_movement.to_ne_bytes());
@@ -518,7 +518,7 @@ fn connection_loop(
                 let _ = connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[69; 32]));
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[0; 32]));
                 let _ = cleanup();
                 *stop_game.lock().unwrap() = true;
                 return;
@@ -527,7 +527,7 @@ fn connection_loop(
                 match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[0; 32]))
                 {
                     Ok(_) => (),
                     Err(error) => {
@@ -541,7 +541,7 @@ fn connection_loop(
                 match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[0; 32]))
                 {
                     Ok(_) => (),
                     Err(error) => {
