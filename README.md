@@ -23,3 +23,5 @@ $ cargo build --release
 ```shell
 $ nix run github:ErrorNoInternet/icmpong -- --help
 ```
+
+Thanks to @SpamixOfficial for the idea!
