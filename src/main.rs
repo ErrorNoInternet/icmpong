@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
             return Ok(());
         }
     };
-    println!("sending ICMPong PING...");
+    println!("sending Ping packet...");
     match connection
         .lock()
         .unwrap()
@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     {
         Ok(_) => (),
         Err(error) => {
-            eprintln!("unable to send PING: {error:?}");
+            eprintln!("unable to send Ping packet: {error:?}");
             return Ok(());
         }
     }
@@ -145,10 +145,17 @@ fn main() -> anyhow::Result<()> {
             }
 
             if event == Event::Key(KeyCode::Char(' ').into()) {
-                let _ = connection
+                match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Start, &[69; 32]));
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Start, &[69; 32]))
+                {
+                    Ok(_) => (),
+                    Err(error) => {
+                        eprintln!("unable to send Start packet: {error:?}");
+                        return Ok(());
+                    }
+                }
                 self_start_game = true;
             }
 
@@ -159,10 +166,16 @@ fn main() -> anyhow::Result<()> {
                         let mut data = [69; 32];
                         data[0..2].copy_from_slice(&player1.lock().unwrap().xpos.to_ne_bytes());
                         data[2..4].copy_from_slice(&player1.lock().unwrap().ypos.to_ne_bytes());
-                        let _ = connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
                             IcmPongPacketType::PaddlePosition,
                             &data,
-                        ));
+                        )) {
+                            Ok(_) => (),
+                            Err(error) => {
+                                eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                return Ok(());
+                            }
+                        };
                     }
                 } else {
                     if player2.lock().unwrap().get_ymin() > YMIN + 1 {
@@ -170,10 +183,16 @@ fn main() -> anyhow::Result<()> {
                         let mut data = [69; 32];
                         data[0..2].copy_from_slice(&player2.lock().unwrap().xpos.to_ne_bytes());
                         data[2..4].copy_from_slice(&player2.lock().unwrap().ypos.to_ne_bytes());
-                        let _ = connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
                             IcmPongPacketType::PaddlePosition,
                             &data,
-                        ));
+                        )) {
+                            Ok(_) => (),
+                            Err(error) => {
+                                eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                return Ok(());
+                            }
+                        };
                     }
                 }
             }
@@ -185,10 +204,16 @@ fn main() -> anyhow::Result<()> {
                         let mut data = [69; 32];
                         data[0..2].copy_from_slice(&player1.lock().unwrap().xpos.to_ne_bytes());
                         data[2..4].copy_from_slice(&player1.lock().unwrap().ypos.to_ne_bytes());
-                        let _ = connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
                             IcmPongPacketType::PaddlePosition,
                             &data,
-                        ));
+                        )) {
+                            Ok(_) => (),
+                            Err(error) => {
+                                eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                return Ok(());
+                            }
+                        };
                     }
                 } else {
                     if player2.lock().unwrap().get_ymax() < YMAX - 1 {
@@ -196,10 +221,16 @@ fn main() -> anyhow::Result<()> {
                         let mut data = [69; 32];
                         data[0..2].copy_from_slice(&player2.lock().unwrap().xpos.to_ne_bytes());
                         data[2..4].copy_from_slice(&player2.lock().unwrap().ypos.to_ne_bytes());
-                        let _ = connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
                             IcmPongPacketType::PaddlePosition,
                             &data,
-                        ));
+                        )) {
+                            Ok(_) => (),
+                            Err(error) => {
+                                eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                return Ok(());
+                            }
+                        };
                     }
                 }
             }
@@ -281,7 +312,7 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    let _ = connection_thread.join();
+    connection_thread.join().unwrap();
     stdout.execute(cursor::Show)?.flush()?;
     terminal::disable_raw_mode()?;
 
@@ -349,7 +380,7 @@ fn connection_loop(
             let packet_data = &packet[13..45];
 
             if packet_type == IcmPongPacketType::Ping {
-                println!("received PING from peer! sending READY...");
+                println!("received Ping packet from peer! sending Ready packet...");
                 match connection
                     .lock()
                     .unwrap()
@@ -357,13 +388,13 @@ fn connection_loop(
                 {
                     Ok(_) => (),
                     Err(error) => {
-                        eprintln!("unable to send READY: {error:?}");
+                        eprintln!("unable to send Ready packet: {error:?}");
                         return;
                     }
                 };
             }
             if packet_type == IcmPongPacketType::Ready && client_id.is_none() {
-                println!("received READY from peer! echoing...");
+                println!("received Ready packet from peer! echoing...");
                 match connection
                     .lock()
                     .unwrap()
@@ -371,7 +402,7 @@ fn connection_loop(
                 {
                     Ok(_) => (),
                     Err(error) => {
-                        eprintln!("unable to send READY: {error:?}");
+                        eprintln!("unable to send Ready packet: {error:?}");
                         return;
                     }
                 };
