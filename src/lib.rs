@@ -8,7 +8,7 @@ use pnet::{
 use rand::Rng;
 use std::net::Ipv6Addr;
 
-const PROTOCOL_VERSION: u8 = 0;
+pub const PROTOCOL_VERSION: u8 = 0;
 
 #[derive(Debug)]
 pub enum IcmPongError {

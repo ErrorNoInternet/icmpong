@@ -46,6 +46,16 @@ fn main() {
             .0
             .payload()
             .to_owned();
-        if &packet[0..7] == "ICMPong".as_bytes() {}
+        if &packet[0..7] == "ICMPong".as_bytes() {
+            let packet_version = packet[7];
+            if packet_version != icmpong::PROTOCOL_VERSION {
+                eprintln!("the other player is on a different version of ICMPong!");
+                eprintln!(
+                    "you are v{}, they are v{packet_version}. please update to the same version.",
+                    icmpong::PROTOCOL_VERSION,
+                );
+                return;
+            }
+        }
     }
 }
