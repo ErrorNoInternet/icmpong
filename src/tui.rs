@@ -1,6 +1,6 @@
 pub const X_MINIMUM: u16 = 0;
 pub const Y_MINIMUM: u16 = 0;
-pub const X_MAXIMUM: u16 = 89;
+pub const X_MAXIMUM: u16 = 79;
 pub const Y_MAXIMUM: u16 = 24;
 pub const GAME_TICK_MILLIS: u64 = 10;
 pub const FIELD_SIZE: u16 = X_MAXIMUM * Y_MAXIMUM;
