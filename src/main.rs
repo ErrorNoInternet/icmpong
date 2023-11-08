@@ -1,6 +1,6 @@
-mod pong;
+mod tui;
 
-use crate::pong::{Field, Game, GAME_TICK_MILLIS, XMAX, XMIN, YMAX, YMIN};
+use crate::tui::{Field, Game, GAME_TICK_MILLIS, XMAX, XMIN, YMAX, YMIN};
 use clap::Parser;
 use crossterm::event::{poll, Event, KeyCode};
 use crossterm::style::{Color, Print, SetBackgroundColor, SetForegroundColor};
@@ -9,6 +9,7 @@ use icmpong::{IcmPongConnection, IcmPongPacket, IcmPongPacketType};
 use pnet::transport::TransportReceiver;
 use pnet::{packet::Packet, transport::icmpv6_packet_iter};
 use rand::Rng;
+use std::io::stdout;
 use std::sync::{Arc, Mutex};
 use std::{io::Write, net::Ipv6Addr, str::FromStr, time::Duration};
 
@@ -25,6 +26,7 @@ fn main() -> anyhow::Result<()> {
     let ipv6_address = match Ipv6Addr::from_str(&arguments.peer) {
         Ok(ipv6_address) => ipv6_address,
         Err(error) => {
+            cleanup()?;
             eprintln!("unable to parse IPv6 address: {error}");
             return Ok(());
         }
@@ -34,6 +36,7 @@ fn main() -> anyhow::Result<()> {
     let (connection, mut rx) = match IcmPongConnection::new(ipv6_address) {
         Ok((connection, rx)) => (Arc::new(Mutex::new(connection)), rx),
         Err(error) => {
+            cleanup()?;
             eprintln!("unable to create IPv6 socket: {error:?}");
             return Ok(());
         }
@@ -46,16 +49,19 @@ fn main() -> anyhow::Result<()> {
     {
         Ok(_) => (),
         Err(error) => {
+            cleanup()?;
             eprintln!("unable to send Ping packet: {error:?}");
             return Ok(());
         }
     }
 
+    let stop_game = Arc::new(Mutex::new(false));
     let connection_established = Arc::new(Mutex::new(false));
     let peer_client_id = Arc::new(Mutex::new(None));
     let peer_start_game = Arc::new(Mutex::new(false));
     let peer_player = Arc::new(Mutex::new(None));
     let thread_connection = connection.clone();
+    let thread_stop_game = stop_game.clone();
     let thread_connnection_established = connection_established.clone();
     let thread_peer_client_id = peer_client_id.clone();
     let thread_peer_start_game = peer_start_game.clone();
@@ -64,6 +70,7 @@ fn main() -> anyhow::Result<()> {
         connection_loop(
             thread_connection,
             &mut rx,
+            thread_stop_game,
             thread_connnection_established,
             thread_peer_client_id,
             thread_peer_start_game,
@@ -100,7 +107,6 @@ fn main() -> anyhow::Result<()> {
     let mut ball_launched = false;
     let mut ball_moving = false;
     let mut update_screen;
-    let mut stdout = std::io::stdout();
     let mut tick_counter: usize = 0;
     let mut game_tick: Duration;
     let mut ball_velocity: f32 = 0.4;
@@ -110,23 +116,31 @@ fn main() -> anyhow::Result<()> {
     let mut score = [0, 0];
 
     terminal::enable_raw_mode()?;
-    stdout
+    stdout()
         .execute(terminal::Clear(terminal::ClearType::All))?
         .execute(cursor::Hide)?
         .execute(SetBackgroundColor(Color::Black))?
         .execute(SetForegroundColor(Color::White))?
         .flush()?;
 
-    'gameloop: loop {
+    'game_loop: loop {
         game_tick = Duration::from_millis(GAME_TICK_MILLIS);
         tick_counter += 1;
         update_screen = tick_counter == 2;
+
+        if *stop_game.lock().unwrap() {
+            break 'game_loop;
+        }
 
         if poll(game_tick)? {
             let event = crossterm::event::read()?;
 
             if event == Event::Key(KeyCode::Esc.into()) {
-                break 'gameloop;
+                let _ = connection
+                    .lock()
+                    .unwrap()
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[69; 32]));
+                break 'game_loop;
             }
 
             if game_started {
@@ -152,6 +166,7 @@ fn main() -> anyhow::Result<()> {
                 {
                     Ok(_) => (),
                     Err(error) => {
+                        cleanup()?;
                         eprintln!("unable to send Start packet: {error:?}");
                         return Ok(());
                     }
@@ -172,6 +187,7 @@ fn main() -> anyhow::Result<()> {
                         )) {
                             Ok(_) => (),
                             Err(error) => {
+                                cleanup()?;
                                 eprintln!("unable to send PaddlePosition packet: {error:?}");
                                 return Ok(());
                             }
@@ -189,6 +205,7 @@ fn main() -> anyhow::Result<()> {
                         )) {
                             Ok(_) => (),
                             Err(error) => {
+                                cleanup()?;
                                 eprintln!("unable to send PaddlePosition packet: {error:?}");
                                 return Ok(());
                             }
@@ -210,6 +227,7 @@ fn main() -> anyhow::Result<()> {
                         )) {
                             Ok(_) => (),
                             Err(error) => {
+                                cleanup()?;
                                 eprintln!("unable to send PaddlePosition packet: {error:?}");
                                 return Ok(());
                             }
@@ -227,6 +245,7 @@ fn main() -> anyhow::Result<()> {
                         )) {
                             Ok(_) => (),
                             Err(error) => {
+                                cleanup()?;
                                 eprintln!("unable to send PaddlePosition packet: {error:?}");
                                 return Ok(());
                             }
@@ -298,7 +317,7 @@ fn main() -> anyhow::Result<()> {
             let y: u16 = i as u16 / XMAX;
             let c: char = field.field_data[i] as char;
 
-            stdout
+            stdout()
                 .execute(cursor::MoveTo(x, y))?
                 .execute(Print(c))?
                 .flush()?;
@@ -311,17 +330,22 @@ fn main() -> anyhow::Result<()> {
             ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
         }
     }
-
     connection_thread.join().unwrap();
-    stdout.execute(cursor::Show)?.flush()?;
-    terminal::disable_raw_mode()?;
+    stdout().execute(SetBackgroundColor(Color::Reset))?;
+    println!("\nquitting!");
+    Ok(())
+}
 
+fn cleanup() -> anyhow::Result<()> {
+    terminal::disable_raw_mode()?;
+    stdout().execute(cursor::Show)?.flush()?;
     Ok(())
 }
 
 fn connection_loop(
     connection: Arc<Mutex<IcmPongConnection>>,
     rx: &mut TransportReceiver,
+    stop_game: Arc<Mutex<bool>>,
     connection_established: Arc<Mutex<bool>>,
     peer_client_id: Arc<Mutex<Option<u32>>>,
     peer_start_game: Arc<Mutex<bool>>,
@@ -338,6 +362,7 @@ fn connection_loop(
                 }
             }
             Err(error) => {
+                let _ = cleanup();
                 eprintln!("unable to iterate packets: {error}");
                 return;
             }
@@ -345,6 +370,7 @@ fn connection_loop(
         if &packet[0..7] == "ICMPong".as_bytes() {
             let packet_version = packet[7];
             if packet_version != icmpong::PROTOCOL_VERSION {
+                let _ = cleanup();
                 eprintln!("the other player is on a different version of ICMPong!");
                 eprintln!(
                     "you are v{}, they are v{packet_version}. please update to the same version.",
@@ -353,6 +379,7 @@ fn connection_loop(
                 return;
             }
             if packet.len() != 45 {
+                let _ = cleanup();
                 eprintln!(
                     "invalid packet size received: expected 45, found {}",
                     packet.len()
@@ -373,11 +400,22 @@ fn connection_loop(
                 match num_traits::FromPrimitive::from_u8(packet[12]) {
                     Some(packet_type) => packet_type,
                     None => {
+                        let _ = cleanup();
                         eprintln!("unknown packet type received ({})", packet[12]);
                         return;
                     }
                 };
             let packet_data = &packet[13..45];
+
+            if packet_type == IcmPongPacketType::Disconnect {
+                let _ = connection
+                    .lock()
+                    .unwrap()
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Disconnect, &[69; 32]));
+                let _ = cleanup();
+                *stop_game.lock().unwrap() = true;
+                return;
+            }
 
             if packet_type == IcmPongPacketType::Ping {
                 println!("received Ping packet from peer! sending Ready packet...");
@@ -388,6 +426,7 @@ fn connection_loop(
                 {
                     Ok(_) => (),
                     Err(error) => {
+                        let _ = cleanup();
                         eprintln!("unable to send Ready packet: {error:?}");
                         return;
                     }
@@ -402,6 +441,7 @@ fn connection_loop(
                 {
                     Ok(_) => (),
                     Err(error) => {
+                        let _ = cleanup();
                         eprintln!("unable to send Ready packet: {error:?}");
                         return;
                     }

@@ -23,6 +23,7 @@ pub enum IcmPongPacketType {
     Ready,
     Start,
     PaddlePosition,
+    Disconnect,
 }
 
 pub struct IcmPongPacket<'a> {
