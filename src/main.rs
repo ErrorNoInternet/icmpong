@@ -28,7 +28,7 @@ struct Arguments {
     name: Option<String>,
 
     /// The initial ball velocity (will slowly increase after each bounce)
-    #[arg(short, long, default_value_t = 0.8)]
+    #[arg(short, long, default_value_t = 0.6)]
     ball_velocity: f32,
 }
 
