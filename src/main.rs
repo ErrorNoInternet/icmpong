@@ -91,7 +91,7 @@ fn main() -> anyhow::Result<()> {
     while !*connection_established.lock().unwrap() {
         std::thread::sleep(Duration::from_millis(1))
     }
-    let self_is_left =
+    let self_is_host =
         connection.lock().unwrap().client_id > peer_client_id.lock().unwrap().unwrap();
     let player1 = Arc::new(Mutex::new(GameObject::new(
         XMIN + 3,
@@ -105,7 +105,7 @@ fn main() -> anyhow::Result<()> {
         4,
         b'X',
     )));
-    *peer_player.lock().unwrap() = Some(if self_is_left {
+    *peer_player.lock().unwrap() = Some(if self_is_host {
         player2.clone()
     } else {
         player1.clone()
@@ -167,7 +167,7 @@ fn main() -> anyhow::Result<()> {
 
             if self_start_game {
                 if event == Event::Key(KeyCode::Up.into()) {
-                    if self_is_left {
+                    if self_is_host {
                         if player1.lock().unwrap().get_ymin() > YMIN + 1 {
                             player1.lock().unwrap().y_position -= 1;
                             let mut data = [69; 32];
@@ -211,7 +211,7 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 if event == Event::Key(KeyCode::Down.into()) {
-                    if self_is_left {
+                    if self_is_host {
                         if player1.lock().unwrap().get_ymax() < YMAX - 1 {
                             player1.lock().unwrap().y_position += 1;
                             let mut data = [69; 32];
@@ -274,7 +274,7 @@ fn main() -> anyhow::Result<()> {
             }
             if ball.lock().unwrap().get_ymin() <= YMIN || ball.lock().unwrap().get_ymax() >= YMAX {
                 ball.lock().unwrap().y_movement *= -1.0;
-                if self_is_left {
+                if self_is_host {
                     match synchronize_ball(&connection, &ball) {
                         Ok(_) => (),
                         Err(error) => {
@@ -294,7 +294,7 @@ fn main() -> anyhow::Result<()> {
                     && ball.lock().unwrap().y_position <= player2.lock().unwrap().get_ymax())
             {
                 ball.lock().unwrap().x_movement *= -1.0;
-                if self_is_left {
+                if self_is_host {
                     match synchronize_ball(&connection, &ball) {
                         Ok(_) => (),
                         Err(error) => {
@@ -309,7 +309,7 @@ fn main() -> anyhow::Result<()> {
             if ball.lock().unwrap().yf32 > YMAX as f32 {
                 ball.lock().unwrap().yf32 = YMAX as f32 - 1.0;
                 ball.lock().unwrap().y_position = YMAX - 1;
-                if self_is_left {
+                if self_is_host {
                     match synchronize_ball(&connection, &ball) {
                         Ok(_) => (),
                         Err(error) => {
@@ -350,7 +350,7 @@ fn main() -> anyhow::Result<()> {
                     field.write(XMAX / 2 - message.len() as u16 / 2, YMAX - 4, message)
                 } else {
                     game_started = true;
-                    if self_is_left {
+                    if self_is_host {
                         let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
                         ball.lock().unwrap().x_movement =
                             random_angle.cos() * *ball_velocity.lock().unwrap();
@@ -384,7 +384,7 @@ fn main() -> anyhow::Result<()> {
             score.lock().unwrap()[round_winner - 1] += 1;
             round_winner = 0;
             *ball.lock().unwrap() = GameObject::new(XMAX / 2, YMAX / 2, 1, b'O');
-            if self_is_left {
+            if self_is_host {
                 let mut data = [69; 32];
                 data[0..4].copy_from_slice(&score.lock().unwrap()[0].to_ne_bytes());
                 data[4..8].copy_from_slice(&score.lock().unwrap()[1].to_ne_bytes());
