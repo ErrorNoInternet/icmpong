@@ -1,9 +1,14 @@
 use pnet::{
-    packet::{icmpv6::echo_request::EchoRequestPacket, ip::IpNextHeaderProtocols::Icmpv6},
+    packet::{
+        icmpv6::{echo_request::MutableEchoRequestPacket, Icmpv6Types},
+        ip::IpNextHeaderProtocols::Icmpv6,
+    },
     transport::{transport_channel, TransportChannelType, TransportReceiver, TransportSender},
 };
 use rand::Rng;
 use std::net::Ipv6Addr;
+
+const PROTOCOL_VERSION: u8 = 0;
 
 #[derive(Debug)]
 pub enum IcmPongError {
@@ -22,11 +27,21 @@ pub struct IcmPongPacket<'a> {
     pub packet_data: &'a [u8; 32],
 }
 
+impl<'a> IcmPongPacket<'a> {
+    pub fn new(packet_type: IcmPongPacketType, packet_data: &'a [u8; 32]) -> Self {
+        Self {
+            version: PROTOCOL_VERSION,
+            packet_type,
+            packet_data,
+        }
+    }
+}
+
 pub struct IcmPongConnection {
     pub peer: Ipv6Addr,
     tx: TransportSender,
     pub rx: TransportReceiver,
-    session_id: u64,
+    client_id: u32,
 }
 
 impl IcmPongConnection {
@@ -42,20 +57,21 @@ impl IcmPongConnection {
             peer,
             tx,
             rx,
-            session_id: rand::thread_rng().gen(),
+            client_id: rand::thread_rng().gen(),
         })
     }
 
     pub fn send_packet(&mut self, packet: IcmPongPacket) -> Result<(), IcmPongError> {
-        let packet_payload = &[
-            "ICMPong".as_bytes(),
+        let mut packet_payload = [
+            "....ICMPong".as_bytes(),
             &packet.version.to_ne_bytes(),
-            &self.session_id.to_ne_bytes(),
+            &self.client_id.to_ne_bytes(),
             &(packet.packet_type as u8).to_ne_bytes(),
             packet.packet_data,
         ]
         .concat();
-        let icmp_packet = EchoRequestPacket::new(&packet_payload).unwrap();
+        let mut icmp_packet = MutableEchoRequestPacket::new(&mut packet_payload).unwrap();
+        icmp_packet.set_icmpv6_type(Icmpv6Types::EchoRequest);
         match self.tx.send_to(icmp_packet, self.peer.into()) {
             Ok(_) => Ok(()),
             Err(error) => Err(IcmPongError::SendPacketError(error)),
