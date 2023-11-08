@@ -21,6 +21,8 @@ pub enum IcmPongError {
 pub enum IcmPongPacketType {
     Ping,
     Ready,
+    Start,
+    PaddlePosition,
 }
 
 pub struct IcmPongPacket<'a> {
@@ -41,13 +43,12 @@ impl<'a> IcmPongPacket<'a> {
 
 pub struct IcmPongConnection {
     pub peer: Ipv6Addr,
-    tx: TransportSender,
-    pub rx: TransportReceiver,
+    pub tx: TransportSender,
     pub client_id: u32,
 }
 
 impl IcmPongConnection {
-    pub fn new(peer: Ipv6Addr) -> Result<Self, IcmPongError> {
+    pub fn new(peer: Ipv6Addr) -> Result<(Self, TransportReceiver), IcmPongError> {
         let (tx, rx) = match transport_channel(
             1500,
             TransportChannelType::Layer4(pnet::transport::TransportProtocol::Ipv6(Icmpv6)),
@@ -55,12 +56,14 @@ impl IcmPongConnection {
             Ok((tx, rx)) => (tx, rx),
             Err(error) => return Err(IcmPongError::CreateSocketError(error)),
         };
-        Ok(Self {
-            peer,
-            tx,
+        Ok((
+            Self {
+                peer,
+                tx,
+                client_id: rand::thread_rng().gen(),
+            },
             rx,
-            client_id: rand::thread_rng().gen(),
-        })
+        ))
     }
 
     pub fn send_packet(&mut self, packet: IcmPongPacket) -> Result<(), IcmPongError> {
