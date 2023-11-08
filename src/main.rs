@@ -396,10 +396,7 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     game_started = true;
                     if self_is_host {
-                        let mut random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                        if random_angle >= -10.0 && random_angle <= 10.0 {
-                            random_angle += rand::thread_rng().gen_range(-20..20) as f32;
-                        }
+                        let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
                         ball.lock().unwrap().x_movement =
                             random_angle.cos() * arguments.ball_velocity;
                         ball.lock().unwrap().y_movement =
@@ -450,10 +447,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
 
-                let mut random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                if random_angle >= -10.0 && random_angle <= 10.0 {
-                    random_angle += rand::thread_rng().gen_range(-20..20) as f32;
-                }
+                let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
                 ball.lock().unwrap().x_movement = random_angle.cos() * arguments.ball_velocity;
                 ball.lock().unwrap().y_movement = random_angle.sin() * arguments.ball_velocity;
                 match synchronize_ball(&connection, &ball) {
