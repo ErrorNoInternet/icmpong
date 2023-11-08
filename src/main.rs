@@ -37,8 +37,8 @@ fn main() -> anyhow::Result<()> {
         }
     };
     if let Some(ref name) = arguments.name {
-        if name.len() > 20 {
-            eprintln!("your name must not be longer than 20 characters!");
+        if name.len() > 30 {
+            eprintln!("your name must not be longer than 30 characters!");
             return Ok(());
         }
     }
