@@ -96,24 +96,22 @@ fn main() {
                     }
                 };
             }
-            if packet_type == IcmPongPacketType::Ready {
-                if peer_client_id.is_none() {
-                    println!("received READY from peer! echoing...");
-                    match connection
-                        .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
-                    {
-                        Ok(_) => (),
-                        Err(error) => {
-                            eprintln!("unable to send READY: {error:?}");
-                            return;
-                        }
-                    };
-                    peer_client_id = Some(client_id);
-                    println!(
-                        "starting game with {} (id: {client_id})...",
-                        connection.peer
-                    );
-                }
+            if packet_type == IcmPongPacketType::Ready && peer_client_id.is_none() {
+                println!("received READY from peer! echoing...");
+                match connection
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
+                {
+                    Ok(_) => (),
+                    Err(error) => {
+                        eprintln!("unable to send READY: {error:?}");
+                        return;
+                    }
+                };
+                peer_client_id = Some(client_id);
+                println!(
+                    "starting game with {} (id: {client_id})...",
+                    connection.peer
+                );
             }
         }
     }
