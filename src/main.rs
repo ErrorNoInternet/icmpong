@@ -288,11 +288,13 @@ fn main() -> anyhow::Result<()> {
             ball.lock().unwrap().x_position = xf32 as u16;
             ball.lock().unwrap().y_position = yf32 as u16;
 
-            if ball.lock().unwrap().x_position >= X_MAXIMUM {
-                round_winner = 1;
-            }
-            if ball.lock().unwrap().x_position <= X_MINIMUM {
-                round_winner = 2;
+            if self_is_host {
+                if ball.lock().unwrap().x_position >= X_MAXIMUM {
+                    round_winner = 1;
+                }
+                if ball.lock().unwrap().x_position <= X_MINIMUM {
+                    round_winner = 2;
+                }
             }
             if ball.lock().unwrap().get_ymin() <= Y_MINIMUM
                 || ball.lock().unwrap().get_ymax() >= Y_MAXIMUM
@@ -394,7 +396,10 @@ fn main() -> anyhow::Result<()> {
                 } else {
                     game_started = true;
                     if self_is_host {
-                        let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                        let mut random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                        if random_angle >= -10.0 && random_angle <= 10.0 {
+                            random_angle += rand::thread_rng().gen_range(-20..20) as f32;
+                        }
                         ball.lock().unwrap().x_movement =
                             random_angle.cos() * arguments.ball_velocity;
                         ball.lock().unwrap().y_movement =
@@ -445,7 +450,10 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
 
-                let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                let mut random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                if random_angle >= -10.0 && random_angle <= 10.0 {
+                    random_angle += rand::thread_rng().gen_range(-20..20) as f32;
+                }
                 ball.lock().unwrap().x_movement = random_angle.cos() * arguments.ball_velocity;
                 ball.lock().unwrap().y_movement = random_angle.sin() * arguments.ball_velocity;
                 match synchronize_ball(&connection, &ball) {
