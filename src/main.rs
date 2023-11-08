@@ -41,12 +41,19 @@ fn main() {
 
     let mut peer_client_id = None;
     loop {
-        let packet = icmpv6_packet_iter(&mut connection.rx)
-            .next()
-            .unwrap()
-            .0
-            .payload()
-            .to_owned();
+        let packet = match icmpv6_packet_iter(&mut connection.rx).next() {
+            Ok(packet) => {
+                if packet.1 != connection.peer {
+                    continue;
+                } else {
+                    packet.0.payload().to_owned()
+                }
+            }
+            Err(error) => {
+                eprintln!("unable to iterate packets: {error}");
+                return;
+            }
+        };
         if &packet[0..7] == "ICMPong".as_bytes() {
             let packet_version = packet[7];
             if packet_version != icmpong::PROTOCOL_VERSION {
@@ -109,7 +116,7 @@ fn main() {
                 };
                 peer_client_id = Some(client_id);
                 println!(
-                    "starting game with {} (id: {client_id})...",
+                    "starting game with {} (peer client id: {client_id})...",
                     connection.peer
                 );
             }
