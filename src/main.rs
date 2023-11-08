@@ -63,6 +63,7 @@ fn main() -> anyhow::Result<()> {
     let ball = Arc::new(Mutex::new(GameObject::new(XMAX / 2, YMAX / 2, 1, b'O')));
     let peer_player = Arc::new(Mutex::new(None));
     let ball_velocity = Arc::new(Mutex::new(0.4));
+    let score = Arc::new(Mutex::new([0, 0]));
     let thread_connection = connection.clone();
     let thread_stop_game = stop_game.clone();
     let thread_connnection_established = connection_established.clone();
@@ -71,6 +72,7 @@ fn main() -> anyhow::Result<()> {
     let thread_ball = ball.clone();
     let thread_peer_player = peer_player.clone();
     let thread_ball_velocity = ball_velocity.clone();
+    let thread_score = score.clone();
     let connection_thread = std::thread::spawn(move || {
         connection_loop(
             thread_connection,
@@ -82,6 +84,7 @@ fn main() -> anyhow::Result<()> {
             thread_ball,
             thread_peer_player,
             thread_ball_velocity,
+            thread_score,
         )
     });
 
@@ -90,7 +93,6 @@ fn main() -> anyhow::Result<()> {
     }
     let self_is_left =
         connection.lock().unwrap().client_id > peer_client_id.lock().unwrap().unwrap();
-    println!("{self_is_left}");
     let player1 = Arc::new(Mutex::new(GameObject::new(
         XMIN + 3,
         (YMAX - YMIN) / 2 - 1,
@@ -113,7 +115,6 @@ fn main() -> anyhow::Result<()> {
     let mut game_started = false;
     let mut game_tick: Duration;
     let mut round_winner = 0;
-    let mut score = [0, 0];
     let mut self_start_game = false;
     let mut tick_counter: usize = 0;
     let mut update_screen;
@@ -325,8 +326,16 @@ fn main() -> anyhow::Result<()> {
             tick_counter = 0;
             field.clear();
 
-            field.write(XMAX / 2 - 5, YMIN, format!(" {:02} ", score[0]).as_str());
-            field.write(XMAX / 2 + 2, YMIN, format!(" {:02} ", score[1]).as_str());
+            field.write(
+                XMAX / 2 - 5,
+                YMIN,
+                format!(" {:02} ", score.lock().unwrap()[0]).as_str(),
+            );
+            field.write(
+                XMAX / 2 + 2,
+                YMIN,
+                format!(" {:02} ", score.lock().unwrap()[1]).as_str(),
+            );
 
             field.draw(&ball.lock().unwrap());
             field.draw(&player1.lock().unwrap());
@@ -372,10 +381,26 @@ fn main() -> anyhow::Result<()> {
         }
 
         if round_winner > 0 {
-            score[round_winner - 1] += 1;
+            score.lock().unwrap()[round_winner - 1] += 1;
             round_winner = 0;
             *ball.lock().unwrap() = GameObject::new(XMAX / 2, YMAX / 2, 1, b'O');
             if self_is_left {
+                let mut data = [69; 32];
+                data[0..4].copy_from_slice(&score.lock().unwrap()[0].to_ne_bytes());
+                data[4..8].copy_from_slice(&score.lock().unwrap()[1].to_ne_bytes());
+                match connection
+                    .lock()
+                    .unwrap()
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::ScoreUpdate, &data))
+                {
+                    Ok(_) => (),
+                    Err(error) => {
+                        cleanup()?;
+                        eprintln!("unable to send ScoreUpdate packet: {error:?}");
+                        return Ok(());
+                    }
+                }
+
                 let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
                 ball.lock().unwrap().x_movement =
                     random_angle.cos() * *ball_velocity.lock().unwrap();
@@ -432,6 +457,7 @@ fn connection_loop(
     ball: Arc<Mutex<GameObject>>,
     peer_player: Arc<Mutex<Option<Arc<Mutex<GameObject>>>>>,
     ball_velocity: Arc<Mutex<f32>>,
+    score: Arc<Mutex<[u32; 2]>>,
 ) {
     let mut client_id = None;
     loop {
@@ -564,6 +590,11 @@ fn connection_loop(
                 } else if packet_type == IcmPongPacketType::BallVelocity {
                     *ball_velocity.lock().unwrap() =
                         f32::from_ne_bytes(packet_data[0..4].try_into().unwrap())
+                } else if packet_type == IcmPongPacketType::ScoreUpdate {
+                    score.lock().unwrap()[0] =
+                        u32::from_ne_bytes(packet_data[0..4].try_into().unwrap());
+                    score.lock().unwrap()[1] =
+                        u32::from_ne_bytes(packet_data[4..8].try_into().unwrap());
                 }
             }
         }

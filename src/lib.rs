@@ -25,6 +25,7 @@ pub enum IcmPongPacketType {
     PaddlePosition,
     BallUpdate,
     BallVelocity,
+    ScoreUpdate,
     Disconnect,
 }
 
