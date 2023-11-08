@@ -1,6 +1,8 @@
 mod tui;
 
-use crate::tui::{Field, GameObject, GAME_TICK_MILLIS, X_MAXIMUM, X_MINIMUM, Y_MAXIMUM, Y_MINIMUM};
+use crate::tui::{
+    Field, GameObject, GAME_TICK_MILLISECONDS, X_MAXIMUM, X_MINIMUM, Y_MAXIMUM, Y_MINIMUM,
+};
 use clap::Parser;
 use crossterm::event::{poll, Event, KeyCode};
 use crossterm::style::{Color, Print, SetBackgroundColor, SetForegroundColor};
@@ -26,7 +28,7 @@ struct Arguments {
     name: Option<String>,
 
     /// The initial ball velocity (will slowly increase after each bounce)
-    #[arg(short, long, default_value_t = 0.5)]
+    #[arg(short, long, default_value_t = 0.8)]
     ball_velocity: f32,
 }
 
@@ -134,12 +136,10 @@ fn main() -> anyhow::Result<()> {
 
     let mut field = Field::new();
     let mut game_started = false;
-    let mut game_tick: Duration;
     let mut round_winner = 0;
     let mut self_start_game = false;
     let mut tick_counter = 0;
     let mut bounces = 0;
-    let mut update_screen;
 
     terminal::enable_raw_mode()?;
     stdout()
@@ -149,10 +149,9 @@ fn main() -> anyhow::Result<()> {
         .execute(SetForegroundColor(Color::White))?
         .flush()?;
 
+    let game_tick = Duration::from_millis(GAME_TICK_MILLISECONDS);
     'game_loop: loop {
-        game_tick = Duration::from_millis(GAME_TICK_MILLIS);
         tick_counter += 1;
-        update_screen = tick_counter == 2;
 
         if *stop_game.lock().unwrap() {
             break 'game_loop;
@@ -353,7 +352,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
 
-        if update_screen {
+        if tick_counter == 2 {
             tick_counter = 0;
             field.clear();
 

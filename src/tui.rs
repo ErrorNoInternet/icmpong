@@ -2,7 +2,7 @@ pub const X_MINIMUM: u16 = 0;
 pub const Y_MINIMUM: u16 = 0;
 pub const X_MAXIMUM: u16 = 79;
 pub const Y_MAXIMUM: u16 = 24;
-pub const GAME_TICK_MILLIS: u64 = 10;
+pub const GAME_TICK_MILLISECONDS: u64 = 25;
 pub const FIELD_SIZE: u16 = X_MAXIMUM * Y_MAXIMUM;
 pub const PIXEL_EMPTY: u8 = b' ';
 
