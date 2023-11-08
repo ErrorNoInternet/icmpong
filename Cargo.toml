@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.75"
 clap = { version = "4.4.7", features = ["derive"] }
 crossterm = "0.27.0"
 num-derive = "0.3.3"
 num-traits = "0.2.15"
 pnet = "0.34.0"
 rand = "0.8.5"
-ratatui = "0.24.0"
