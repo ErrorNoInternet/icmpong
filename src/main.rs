@@ -13,10 +13,11 @@ use std::io::stdout;
 use std::sync::{Arc, Mutex};
 use std::{io::Write, net::Ipv6Addr, str::FromStr, time::Duration};
 
+/// The classic game of Pong, in your terminal, over ICMPv6!
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Arguments {
-    /// The IPv6 address of person you want to play pong with
+    /// The IPv6 address of person you want to play ICMPong with
     #[arg(short, long)]
     peer: String,
 }
