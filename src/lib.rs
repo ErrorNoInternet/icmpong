@@ -23,6 +23,8 @@ pub enum IcmPongPacketType {
     Ready,
     Start,
     PaddlePosition,
+    BallUpdate,
+    BallVelocity,
     Disconnect,
 }
 

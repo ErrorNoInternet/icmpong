@@ -6,36 +6,36 @@ pub const GAME_TICK_MILLIS: u64 = 10;
 pub const FIELD_SIZE: u16 = XMAX * YMAX;
 pub const PIXEL_EMPTY: u8 = b' ';
 
-pub struct Game {
-    pub xpos: u16,
-    pub ypos: u16,
+pub struct GameObject {
+    pub x_position: u16,
+    pub y_position: u16,
     pub size: u16,
     pub pixel: u8,
-    pub xmov: f32,
-    pub ymov: f32,
+    pub x_movement: f32,
+    pub y_movement: f32,
     pub xf32: f32,
     pub yf32: f32,
 }
 
-impl Game {
+impl GameObject {
     pub fn get_ymin(self: &Self) -> u16 {
-        self.ypos
+        self.y_position
     }
 
     pub fn get_ymax(self: &Self) -> u16 {
-        self.ypos + self.size
+        self.y_position + self.size
     }
 }
 
-impl Game {
+impl GameObject {
     pub fn new(x: u16, y: u16, size: u16, pixel: u8) -> Self {
         Self {
-            xpos: x,
-            ypos: y,
+            x_position: x,
+            y_position: y,
             size,
             pixel,
-            xmov: 0.0,
-            ymov: 0.0,
+            x_movement: 0.0,
+            y_movement: 0.0,
             xf32: x as f32,
             yf32: y as f32,
         }
@@ -76,8 +76,8 @@ impl Field {
         (x + y * XMAX) as usize
     }
 
-    pub fn draw(self: &mut Self, game: &Game) {
-        let x = game.xpos;
+    pub fn draw(self: &mut Self, game: &GameObject) {
+        let x = game.x_position;
         for y in game.get_ymin()..game.get_ymax() {
             self.field_data[self.get_idx(&x, &y)] = game.pixel;
         }

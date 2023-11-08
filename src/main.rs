@@ -1,11 +1,11 @@
 mod tui;
 
-use crate::tui::{Field, Game, GAME_TICK_MILLIS, XMAX, XMIN, YMAX, YMIN};
+use crate::tui::{Field, GameObject, GAME_TICK_MILLIS, XMAX, XMIN, YMAX, YMIN};
 use clap::Parser;
 use crossterm::event::{poll, Event, KeyCode};
 use crossterm::style::{Color, Print, SetBackgroundColor, SetForegroundColor};
 use crossterm::{cursor, terminal, ExecutableCommand};
-use icmpong::{IcmPongConnection, IcmPongPacket, IcmPongPacketType};
+use icmpong::{IcmPongConnection, IcmPongError, IcmPongPacket, IcmPongPacketType};
 use pnet::transport::TransportReceiver;
 use pnet::{packet::Packet, transport::icmpv6_packet_iter};
 use rand::Rng;
@@ -60,13 +60,17 @@ fn main() -> anyhow::Result<()> {
     let connection_established = Arc::new(Mutex::new(false));
     let peer_client_id = Arc::new(Mutex::new(None));
     let peer_start_game = Arc::new(Mutex::new(false));
+    let ball = Arc::new(Mutex::new(GameObject::new(XMAX / 2, YMAX / 2, 1, b'O')));
     let peer_player = Arc::new(Mutex::new(None));
+    let ball_velocity = Arc::new(Mutex::new(0.4));
     let thread_connection = connection.clone();
     let thread_stop_game = stop_game.clone();
     let thread_connnection_established = connection_established.clone();
     let thread_peer_client_id = peer_client_id.clone();
     let thread_peer_start_game = peer_start_game.clone();
+    let thread_ball = ball.clone();
     let thread_peer_player = peer_player.clone();
+    let thread_ball_velocity = ball_velocity.clone();
     let connection_thread = std::thread::spawn(move || {
         connection_loop(
             thread_connection,
@@ -75,7 +79,9 @@ fn main() -> anyhow::Result<()> {
             thread_connnection_established,
             thread_peer_client_id,
             thread_peer_start_game,
+            thread_ball,
             thread_peer_player,
+            thread_ball_velocity,
         )
     });
 
@@ -85,13 +91,13 @@ fn main() -> anyhow::Result<()> {
     let self_is_left =
         connection.lock().unwrap().client_id > peer_client_id.lock().unwrap().unwrap();
     println!("{self_is_left}");
-    let player1 = Arc::new(Mutex::new(Game::new(
+    let player1 = Arc::new(Mutex::new(GameObject::new(
         XMIN + 3,
         (YMAX - YMIN) / 2 - 1,
         4,
         b'X',
     )));
-    let player2 = Arc::new(Mutex::new(Game::new(
+    let player2 = Arc::new(Mutex::new(GameObject::new(
         XMAX - 4,
         (YMAX - YMIN) / 2 - 1,
         4,
@@ -103,17 +109,14 @@ fn main() -> anyhow::Result<()> {
         player1.clone()
     });
 
-    let mut self_start_game = false;
-    let mut game_started = false;
-    let mut ball_moving = false;
-    let mut update_screen;
-    let mut tick_counter: usize = 0;
-    let mut game_tick: Duration;
-    let mut ball_velocity: f32 = 0.4;
     let mut field = Field::new();
-    let mut ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
+    let mut game_started = false;
+    let mut game_tick: Duration;
     let mut round_winner = 0;
     let mut score = [0, 0];
+    let mut self_start_game = false;
+    let mut tick_counter: usize = 0;
+    let mut update_screen;
 
     terminal::enable_raw_mode()?;
     stdout()
@@ -161,117 +164,160 @@ fn main() -> anyhow::Result<()> {
                 self_start_game = true;
             }
 
-            if event == Event::Key(KeyCode::Up.into()) {
-                if self_is_left {
-                    if player1.lock().unwrap().get_ymin() > YMIN + 1 {
-                        player1.lock().unwrap().ypos -= 1;
-                        let mut data = [69; 32];
-                        data[0..2].copy_from_slice(&player1.lock().unwrap().xpos.to_ne_bytes());
-                        data[2..4].copy_from_slice(&player1.lock().unwrap().ypos.to_ne_bytes());
-                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
-                            IcmPongPacketType::PaddlePosition,
-                            &data,
-                        )) {
-                            Ok(_) => (),
-                            Err(error) => {
-                                cleanup()?;
-                                eprintln!("unable to send PaddlePosition packet: {error:?}");
-                                return Ok(());
-                            }
-                        };
-                    }
-                } else {
-                    if player2.lock().unwrap().get_ymin() > YMIN + 1 {
-                        player2.lock().unwrap().ypos -= 1;
-                        let mut data = [69; 32];
-                        data[0..2].copy_from_slice(&player2.lock().unwrap().xpos.to_ne_bytes());
-                        data[2..4].copy_from_slice(&player2.lock().unwrap().ypos.to_ne_bytes());
-                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
-                            IcmPongPacketType::PaddlePosition,
-                            &data,
-                        )) {
-                            Ok(_) => (),
-                            Err(error) => {
-                                cleanup()?;
-                                eprintln!("unable to send PaddlePosition packet: {error:?}");
-                                return Ok(());
-                            }
-                        };
+            if self_start_game {
+                if event == Event::Key(KeyCode::Up.into()) {
+                    if self_is_left {
+                        if player1.lock().unwrap().get_ymin() > YMIN + 1 {
+                            player1.lock().unwrap().y_position -= 1;
+                            let mut data = [69; 32];
+                            data[0..2]
+                                .copy_from_slice(&player1.lock().unwrap().x_position.to_ne_bytes());
+                            data[2..4]
+                                .copy_from_slice(&player1.lock().unwrap().y_position.to_ne_bytes());
+                            match connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                                IcmPongPacketType::PaddlePosition,
+                                &data,
+                            )) {
+                                Ok(_) => (),
+                                Err(error) => {
+                                    cleanup()?;
+                                    eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                    return Ok(());
+                                }
+                            };
+                        }
+                    } else {
+                        if player2.lock().unwrap().get_ymin() > YMIN + 1 {
+                            player2.lock().unwrap().y_position -= 1;
+                            let mut data = [69; 32];
+                            data[0..2]
+                                .copy_from_slice(&player2.lock().unwrap().x_position.to_ne_bytes());
+                            data[2..4]
+                                .copy_from_slice(&player2.lock().unwrap().y_position.to_ne_bytes());
+                            match connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                                IcmPongPacketType::PaddlePosition,
+                                &data,
+                            )) {
+                                Ok(_) => (),
+                                Err(error) => {
+                                    cleanup()?;
+                                    eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                    return Ok(());
+                                }
+                            };
+                        }
                     }
                 }
-            }
 
-            if event == Event::Key(KeyCode::Down.into()) {
-                if self_is_left {
-                    if player1.lock().unwrap().get_ymax() < YMAX - 1 {
-                        player1.lock().unwrap().ypos += 1;
-                        let mut data = [69; 32];
-                        data[0..2].copy_from_slice(&player1.lock().unwrap().xpos.to_ne_bytes());
-                        data[2..4].copy_from_slice(&player1.lock().unwrap().ypos.to_ne_bytes());
-                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
-                            IcmPongPacketType::PaddlePosition,
-                            &data,
-                        )) {
-                            Ok(_) => (),
-                            Err(error) => {
-                                cleanup()?;
-                                eprintln!("unable to send PaddlePosition packet: {error:?}");
-                                return Ok(());
-                            }
-                        };
-                    }
-                } else {
-                    if player2.lock().unwrap().get_ymax() < YMAX - 1 {
-                        player2.lock().unwrap().ypos += 1;
-                        let mut data = [69; 32];
-                        data[0..2].copy_from_slice(&player2.lock().unwrap().xpos.to_ne_bytes());
-                        data[2..4].copy_from_slice(&player2.lock().unwrap().ypos.to_ne_bytes());
-                        match connection.lock().unwrap().send_packet(IcmPongPacket::new(
-                            IcmPongPacketType::PaddlePosition,
-                            &data,
-                        )) {
-                            Ok(_) => (),
-                            Err(error) => {
-                                cleanup()?;
-                                eprintln!("unable to send PaddlePosition packet: {error:?}");
-                                return Ok(());
-                            }
-                        };
+                if event == Event::Key(KeyCode::Down.into()) {
+                    if self_is_left {
+                        if player1.lock().unwrap().get_ymax() < YMAX - 1 {
+                            player1.lock().unwrap().y_position += 1;
+                            let mut data = [69; 32];
+                            data[0..2]
+                                .copy_from_slice(&player1.lock().unwrap().x_position.to_ne_bytes());
+                            data[2..4]
+                                .copy_from_slice(&player1.lock().unwrap().y_position.to_ne_bytes());
+                            match connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                                IcmPongPacketType::PaddlePosition,
+                                &data,
+                            )) {
+                                Ok(_) => (),
+                                Err(error) => {
+                                    cleanup()?;
+                                    eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                    return Ok(());
+                                }
+                            };
+                        }
+                    } else {
+                        if player2.lock().unwrap().get_ymax() < YMAX - 1 {
+                            player2.lock().unwrap().y_position += 1;
+                            let mut data = [69; 32];
+                            data[0..2]
+                                .copy_from_slice(&player2.lock().unwrap().x_position.to_ne_bytes());
+                            data[2..4]
+                                .copy_from_slice(&player2.lock().unwrap().y_position.to_ne_bytes());
+                            match connection.lock().unwrap().send_packet(IcmPongPacket::new(
+                                IcmPongPacketType::PaddlePosition,
+                                &data,
+                            )) {
+                                Ok(_) => (),
+                                Err(error) => {
+                                    cleanup()?;
+                                    eprintln!("unable to send PaddlePosition packet: {error:?}");
+                                    return Ok(());
+                                }
+                            };
+                        }
                     }
                 }
             }
         }
 
-        if ball_moving {
-            ball.xf32 += ball.xmov;
-            ball.yf32 += ball.ymov;
+        if game_started {
+            let mut xf32 = ball.lock().unwrap().xf32;
+            xf32 += ball.lock().unwrap().x_movement;
+            ball.lock().unwrap().xf32 = xf32;
+            let mut yf32 = ball.lock().unwrap().yf32;
+            yf32 += ball.lock().unwrap().y_movement;
+            ball.lock().unwrap().yf32 = yf32;
+            ball.lock().unwrap().x_position = xf32 as u16;
+            ball.lock().unwrap().y_position = yf32 as u16;
 
-            ball.xpos = ball.xf32 as u16;
-            ball.ypos = ball.yf32 as u16;
-
-            if ball.xpos >= XMAX {
+            if ball.lock().unwrap().x_position >= XMAX {
                 round_winner = 1;
             }
-            if ball.xpos <= XMIN {
+            if ball.lock().unwrap().x_position <= XMIN {
                 round_winner = 2;
             }
-            if ball.get_ymin() <= YMIN || ball.get_ymax() >= YMAX {
-                ball.ymov *= -1.0
+            if ball.lock().unwrap().get_ymin() <= YMIN || ball.lock().unwrap().get_ymax() >= YMAX {
+                ball.lock().unwrap().y_movement *= -1.0;
+                if self_is_left {
+                    match synchronize_ball(&connection, &ball) {
+                        Ok(_) => (),
+                        Err(error) => {
+                            cleanup()?;
+                            eprintln!("unable to send BallUpdate packet: {error:?}");
+                            return Ok(());
+                        }
+                    }
+                }
             }
 
-            if (ball.xpos == player1.lock().unwrap().xpos
-                && ball.ypos >= player1.lock().unwrap().get_ymin()
-                && ball.ypos <= player1.lock().unwrap().get_ymax())
-                || (ball.xpos == player2.lock().unwrap().xpos
-                    && ball.ypos >= player2.lock().unwrap().get_ymin()
-                    && ball.ypos <= player2.lock().unwrap().get_ymax())
+            if (ball.lock().unwrap().x_position == player1.lock().unwrap().x_position
+                && ball.lock().unwrap().y_position >= player1.lock().unwrap().get_ymin()
+                && ball.lock().unwrap().y_position <= player1.lock().unwrap().get_ymax())
+                || (ball.lock().unwrap().x_position == player2.lock().unwrap().x_position
+                    && ball.lock().unwrap().y_position >= player2.lock().unwrap().get_ymin()
+                    && ball.lock().unwrap().y_position <= player2.lock().unwrap().get_ymax())
             {
-                ball.xmov *= -1.0
+                ball.lock().unwrap().x_movement *= -1.0;
+                if self_is_left {
+                    match synchronize_ball(&connection, &ball) {
+                        Ok(_) => (),
+                        Err(error) => {
+                            cleanup()?;
+                            eprintln!("unable to send BallUpdate packet: {error:?}");
+                            return Ok(());
+                        }
+                    }
+                }
             }
 
-            if ball.yf32 > YMAX as f32 {
-                ball.yf32 = YMAX as f32 - 1.0;
-                ball.ypos = YMAX - 1;
+            if ball.lock().unwrap().yf32 > YMAX as f32 {
+                ball.lock().unwrap().yf32 = YMAX as f32 - 1.0;
+                ball.lock().unwrap().y_position = YMAX - 1;
+                if self_is_left {
+                    match synchronize_ball(&connection, &ball) {
+                        Ok(_) => (),
+                        Err(error) => {
+                            cleanup()?;
+                            eprintln!("unable to send BallUpdate packet: {error:?}");
+                            return Ok(());
+                        }
+                    }
+                }
             }
         }
 
@@ -282,7 +328,7 @@ fn main() -> anyhow::Result<()> {
             field.write(XMAX / 2 - 5, YMIN, format!(" {:02} ", score[0]).as_str());
             field.write(XMAX / 2 + 2, YMIN, format!(" {:02} ", score[1]).as_str());
 
-            field.draw(&ball);
+            field.draw(&ball.lock().unwrap());
             field.draw(&player1.lock().unwrap());
             field.draw(&player2.lock().unwrap());
 
@@ -295,14 +341,20 @@ fn main() -> anyhow::Result<()> {
                     field.write(XMAX / 2 - message.len() as u16 / 2, YMAX - 4, message)
                 } else {
                     game_started = true;
-                    if ball_moving {
-                        ball_moving = false;
-                        ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
-                    } else {
-                        ball_moving = true;
+                    if self_is_left {
                         let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                        ball.xmov = random_angle.cos() * ball_velocity;
-                        ball.ymov = random_angle.sin() * ball_velocity;
+                        ball.lock().unwrap().x_movement =
+                            random_angle.cos() * *ball_velocity.lock().unwrap();
+                        ball.lock().unwrap().y_movement =
+                            random_angle.sin() * *ball_velocity.lock().unwrap();
+                        match synchronize_ball(&connection, &ball) {
+                            Ok(_) => (),
+                            Err(error) => {
+                                cleanup()?;
+                                eprintln!("unable to send BallUpdate packet: {error:?}");
+                                return Ok(());
+                            }
+                        }
                     }
                 }
             }
@@ -322,13 +374,45 @@ fn main() -> anyhow::Result<()> {
         if round_winner > 0 {
             score[round_winner - 1] += 1;
             round_winner = 0;
-            ball_moving = false;
-            ball = Game::new(XMAX / 2, YMAX / 2, 1, b'O');
+            *ball.lock().unwrap() = GameObject::new(XMAX / 2, YMAX / 2, 1, b'O');
+            if self_is_left {
+                let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+                ball.lock().unwrap().x_movement =
+                    random_angle.cos() * *ball_velocity.lock().unwrap();
+                ball.lock().unwrap().y_movement =
+                    random_angle.sin() * *ball_velocity.lock().unwrap();
+                match synchronize_ball(&connection, &ball) {
+                    Ok(_) => (),
+                    Err(error) => {
+                        cleanup()?;
+                        eprintln!("unable to send BallUpdate packet: {error:?}");
+                        return Ok(());
+                    }
+                }
+            }
         }
     }
     connection_thread.join().unwrap();
     stdout().execute(SetBackgroundColor(Color::Reset))?;
     println!("\nquitting!");
+    Ok(())
+}
+
+fn synchronize_ball(
+    connection: &Arc<Mutex<IcmPongConnection>>,
+    ball: &Arc<Mutex<GameObject>>,
+) -> Result<(), IcmPongError> {
+    let mut data = [69; 32];
+    data[0..2].copy_from_slice(&ball.lock().unwrap().x_position.to_ne_bytes());
+    data[2..4].copy_from_slice(&ball.lock().unwrap().y_position.to_ne_bytes());
+    data[4..8].copy_from_slice(&ball.lock().unwrap().x_movement.to_ne_bytes());
+    data[8..12].copy_from_slice(&ball.lock().unwrap().y_movement.to_ne_bytes());
+    data[12..16].copy_from_slice(&ball.lock().unwrap().xf32.to_ne_bytes());
+    data[16..20].copy_from_slice(&ball.lock().unwrap().yf32.to_ne_bytes());
+    connection
+        .lock()
+        .unwrap()
+        .send_packet(IcmPongPacket::new(IcmPongPacketType::BallUpdate, &data))?;
     Ok(())
 }
 
@@ -345,7 +429,9 @@ fn connection_loop(
     connection_established: Arc<Mutex<bool>>,
     peer_client_id: Arc<Mutex<Option<u32>>>,
     peer_start_game: Arc<Mutex<bool>>,
-    peer_player: Arc<Mutex<Option<Arc<Mutex<Game>>>>>,
+    ball: Arc<Mutex<GameObject>>,
+    peer_player: Arc<Mutex<Option<Arc<Mutex<GameObject>>>>>,
+    ball_velocity: Arc<Mutex<f32>>,
 ) {
     let mut client_id = None;
     loop {
@@ -411,9 +497,7 @@ fn connection_loop(
                 let _ = cleanup();
                 *stop_game.lock().unwrap() = true;
                 return;
-            }
-
-            if packet_type == IcmPongPacketType::Ping {
+            } else if packet_type == IcmPongPacketType::Ping {
                 println!("received Ping packet from peer! sending Ready packet...");
                 match connection
                     .lock()
@@ -427,8 +511,7 @@ fn connection_loop(
                         return;
                     }
                 };
-            }
-            if packet_type == IcmPongPacketType::Ready && client_id.is_none() {
+            } else if packet_type == IcmPongPacketType::Ready && client_id.is_none() {
                 println!("received Ready packet from peer! echoing...");
                 match connection
                     .lock()
@@ -458,13 +541,29 @@ fn connection_loop(
                     let player = peer_player.lock().unwrap();
                     match player.to_owned() {
                         Some(player) => {
-                            player.lock().unwrap().xpos =
+                            player.lock().unwrap().x_position =
                                 u16::from_ne_bytes(packet_data[0..2].try_into().unwrap());
-                            player.lock().unwrap().ypos =
+                            player.lock().unwrap().y_position =
                                 u16::from_ne_bytes(packet_data[2..4].try_into().unwrap());
                         }
                         None => (),
                     }
+                } else if packet_type == IcmPongPacketType::BallUpdate {
+                    ball.lock().unwrap().x_position =
+                        u16::from_ne_bytes(packet_data[0..2].try_into().unwrap());
+                    ball.lock().unwrap().y_position =
+                        u16::from_ne_bytes(packet_data[2..4].try_into().unwrap());
+                    ball.lock().unwrap().x_movement =
+                        f32::from_ne_bytes(packet_data[4..8].try_into().unwrap());
+                    ball.lock().unwrap().y_movement =
+                        f32::from_ne_bytes(packet_data[8..12].try_into().unwrap());
+                    ball.lock().unwrap().xf32 =
+                        f32::from_ne_bytes(packet_data[12..16].try_into().unwrap());
+                    ball.lock().unwrap().yf32 =
+                        f32::from_ne_bytes(packet_data[16..20].try_into().unwrap());
+                } else if packet_type == IcmPongPacketType::BallVelocity {
+                    *ball_velocity.lock().unwrap() =
+                        f32::from_ne_bytes(packet_data[0..4].try_into().unwrap())
                 }
             }
         }
