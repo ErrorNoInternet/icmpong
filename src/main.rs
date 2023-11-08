@@ -84,13 +84,13 @@ fn main() -> anyhow::Result<()> {
     let self_is_left =
         connection.lock().unwrap().client_id > peer_client_id.lock().unwrap().unwrap();
     println!("{self_is_left}");
-    let mut player1 = Arc::new(Mutex::new(Game::new(
+    let player1 = Arc::new(Mutex::new(Game::new(
         XMIN + 3,
         (YMAX - YMIN) / 2 - 1,
         4,
         b'X',
     )));
-    let mut player2 = Arc::new(Mutex::new(Game::new(
+    let player2 = Arc::new(Mutex::new(Game::new(
         XMAX - 4,
         (YMAX - YMIN) / 2 - 1,
         4,
@@ -135,7 +135,9 @@ fn main() -> anyhow::Result<()> {
         if poll(game_tick)? {
             let event = crossterm::event::read()?;
 
-            if event == Event::Key(KeyCode::Esc.into()) {
+            if event == Event::Key(KeyCode::Esc.into())
+                || event == Event::Key(KeyCode::Char('q').into())
+            {
                 let _ = connection
                     .lock()
                     .unwrap()
