@@ -13,6 +13,8 @@ use std::io::stdout;
 use std::sync::{Arc, Mutex};
 use std::{io::Write, net::Ipv6Addr, str::FromStr, time::Duration};
 
+const BALL_VELOCITY: f32 = 0.5;
+
 /// The classic game of Pong, in your terminal, over ICMPv6!
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -376,8 +378,8 @@ fn main() -> anyhow::Result<()> {
                     game_started = true;
                     if self_is_host {
                         let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                        ball.lock().unwrap().x_movement = random_angle.cos() * 0.4;
-                        ball.lock().unwrap().y_movement = random_angle.sin() * 0.4;
+                        ball.lock().unwrap().x_movement = random_angle.cos() * BAL_VELOCITY;
+                        ball.lock().unwrap().y_movement = random_angle.sin() * BAL_VELOCITY;
                         match synchronize_ball(&connection, &ball) {
                             Ok(_) => (),
                             Err(error) => {
@@ -425,8 +427,8 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                ball.lock().unwrap().x_movement = random_angle.cos() * 0.4;
-                ball.lock().unwrap().y_movement = random_angle.sin() * 0.4;
+                ball.lock().unwrap().x_movement = random_angle.cos() * BAL_VELOCITY;
+                ball.lock().unwrap().y_movement = random_angle.sin() * BAL_VELOCITY;
                 match synchronize_ball(&connection, &ball) {
                     Ok(_) => (),
                     Err(error) => {
