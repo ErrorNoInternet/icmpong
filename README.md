@@ -1,6 +1,8 @@
 # icmpong
 The classic game of [Pong](https://en.wikipedia.org/wiki/Pong), in your terminal, over ICMPv6!
 
+https://github.com/ErrorNoInternet/icmpong/assets/61157623/08f245c1-0167-433f-aa61-bbfdb253f1c3
+
 ### How does this work?
 We are basically "using the `ping` command to send data" between two people, instead of using TCP or UDP.
 
