@@ -411,17 +411,17 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
             }
-        }
 
-        for i in 0..field.field_data.len() {
-            let x: u16 = i as u16 % X_MAXIMUM;
-            let y: u16 = i as u16 / X_MAXIMUM;
-            let c: char = field.field_data[i] as char;
+            for i in 0..field.field_data.len() {
+                let x: u16 = i as u16 % X_MAXIMUM;
+                let y: u16 = i as u16 / X_MAXIMUM;
+                let c: char = field.field_data[i] as char;
 
-            stdout()
-                .execute(cursor::MoveTo(x, y))?
-                .execute(Print(c))?
-                .flush()?;
+                stdout()
+                    .execute(cursor::MoveTo(x, y))?
+                    .execute(Print(c))?
+                    .flush()?;
+            }
         }
 
         if round_winner > 0 {
