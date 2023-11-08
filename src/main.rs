@@ -20,6 +20,10 @@ struct Arguments {
     /// The IPv6 address of person you want to play ICMPong with
     #[arg(short, long)]
     peer: String,
+
+    /// The name you want the other person to see
+    #[arg(short, long)]
+    name: Option<String>,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -32,6 +36,12 @@ fn main() -> anyhow::Result<()> {
             return Ok(());
         }
     };
+    if let Some(ref name) = arguments.name {
+        if name.len() > 20 {
+            eprintln!("your name must not be longer than 20 characters!");
+            return Ok(());
+        }
+    }
 
     println!("establishing connection with {ipv6_address}...");
     let (connection, mut rx) = match IcmPongConnection::new(ipv6_address) {
@@ -56,12 +66,14 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    let self_name = arguments.name.clone();
     let stop_game = Arc::new(Mutex::new(false));
     let connection_established = Arc::new(Mutex::new(false));
     let peer_client_id = Arc::new(Mutex::new(None));
     let peer_start_game = Arc::new(Mutex::new(false));
     let ball = Arc::new(Mutex::new(GameObject::new(XMAX / 2, YMAX / 2, 1, b'O')));
     let peer_player = Arc::new(Mutex::new(None));
+    let peer_name = Arc::new(Mutex::new(None));
     let score = Arc::new(Mutex::new([0, 0]));
     let thread_connection = connection.clone();
     let thread_stop_game = stop_game.clone();
@@ -70,9 +82,11 @@ fn main() -> anyhow::Result<()> {
     let thread_peer_start_game = peer_start_game.clone();
     let thread_ball = ball.clone();
     let thread_peer_player = peer_player.clone();
+    let thread_peer_name = peer_name.clone();
     let thread_score = score.clone();
     let connection_thread = std::thread::spawn(move || {
         connection_loop(
+            self_name,
             thread_connection,
             &mut rx,
             thread_stop_game,
@@ -81,6 +95,7 @@ fn main() -> anyhow::Result<()> {
             thread_peer_start_game,
             thread_ball,
             thread_peer_player,
+            thread_peer_name,
             thread_score,
         )
     });
@@ -339,6 +354,12 @@ fn main() -> anyhow::Result<()> {
                 YMIN,
                 format!(" {:02} ", score.lock().unwrap()[1]).as_str(),
             );
+            if let Some(ref name) = arguments.name {
+                field.write(XMIN, YMIN, &name);
+            }
+            if let Some(peer_name) = peer_name.lock().unwrap().to_owned() {
+                field.write(XMAX - peer_name.len() as u16, YMIN, &peer_name);
+            }
 
             field.draw(&ball.lock().unwrap());
             field.draw(&player1.lock().unwrap());
@@ -448,6 +469,7 @@ fn cleanup() -> anyhow::Result<()> {
 }
 
 fn connection_loop(
+    name: Option<String>,
     connection: Arc<Mutex<IcmPongConnection>>,
     rx: &mut TransportReceiver,
     stop_game: Arc<Mutex<bool>>,
@@ -456,6 +478,7 @@ fn connection_loop(
     peer_start_game: Arc<Mutex<bool>>,
     ball: Arc<Mutex<GameObject>>,
     peer_player: Arc<Mutex<Option<Arc<Mutex<GameObject>>>>>,
+    peer_name: Arc<Mutex<Option<String>>>,
     score: Arc<Mutex<[u32; 2]>>,
 ) {
     let mut client_id = None;
@@ -524,10 +547,15 @@ fn connection_loop(
                 return;
             } else if packet_type == IcmPongPacketType::Ping {
                 println!("received Ping packet from peer! sending Ready packet...");
+                let data = &mut [0u8; 32];
+                if let Some(ref name) = name {
+                    data[0] = name.len() as u8;
+                    data[1..name.len() + 1].copy_from_slice(name.clone().as_bytes());
+                }
                 match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[0; 32]))
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &data))
                 {
                     Ok(_) => (),
                     Err(error) => {
@@ -538,10 +566,24 @@ fn connection_loop(
                 };
             } else if packet_type == IcmPongPacketType::Ready && client_id.is_none() {
                 println!("received Ready packet from peer! echoing...");
+                if packet_data[0] != 0 {
+                    let name_length = packet_data[0] as usize;
+                    *peer_name.lock().unwrap() = Some(
+                        std::str::from_utf8(&packet_data[1..name_length + 1])
+                            .unwrap()
+                            .to_string(),
+                    )
+                }
+
+                let data = &mut [0u8; 32];
+                if let Some(ref name) = name {
+                    data[0] = name.len() as u8;
+                    data[1..name.len() + 1].copy_from_slice(name.clone().as_bytes());
+                }
                 match connection
                     .lock()
                     .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[0; 32]))
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &data))
                 {
                     Ok(_) => (),
                     Err(error) => {
