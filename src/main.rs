@@ -39,6 +39,7 @@ fn main() {
         }
     }
 
+    let mut peer_client_id = None;
     loop {
         let packet = icmpv6_packet_iter(&mut connection.rx)
             .next()
@@ -55,6 +56,64 @@ fn main() {
                     icmpong::PROTOCOL_VERSION,
                 );
                 return;
+            }
+            if packet.len() != 45 {
+                eprintln!(
+                    "invalid packet size received: expected 45, found {}",
+                    packet.len()
+                );
+                return;
+            }
+            let client_id = u32::from_ne_bytes(match packet[8..12].try_into() {
+                Ok(peer_client_id) => peer_client_id,
+                Err(error) => {
+                    eprintln!("unable to deserialize peer client id: {error}");
+                    return;
+                }
+            });
+            if client_id == connection.client_id {
+                continue;
+            }
+            let packet_type: IcmPongPacketType =
+                match num_traits::FromPrimitive::from_u8(packet[12]) {
+                    Some(packet_type) => packet_type,
+                    None => {
+                        eprintln!("unknown packet type received ({})", packet[12]);
+                        return;
+                    }
+                };
+            let packet_data = &packet[13..45];
+
+            if packet_type == IcmPongPacketType::Ping {
+                println!("received PING from peer! sending READY...");
+                match connection
+                    .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
+                {
+                    Ok(_) => (),
+                    Err(error) => {
+                        eprintln!("unable to send READY: {error:?}");
+                        return;
+                    }
+                };
+            }
+            if packet_type == IcmPongPacketType::Ready {
+                if peer_client_id.is_none() {
+                    println!("received READY from peer! echoing...");
+                    match connection
+                        .send_packet(IcmPongPacket::new(IcmPongPacketType::Ready, &[69; 32]))
+                    {
+                        Ok(_) => (),
+                        Err(error) => {
+                            eprintln!("unable to send READY: {error:?}");
+                            return;
+                        }
+                    };
+                    peer_client_id = Some(client_id);
+                    println!(
+                        "starting game with {} (id: {client_id})...",
+                        connection.peer
+                    );
+                }
             }
         }
     }

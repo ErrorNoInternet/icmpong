@@ -1,3 +1,4 @@
+use num_derive::FromPrimitive;
 use pnet::{
     packet::{
         icmpv6::{echo_request::MutableEchoRequestPacket, Icmpv6Types},
@@ -16,9 +17,10 @@ pub enum IcmPongError {
     SendPacketError(std::io::Error),
 }
 
+#[derive(Debug, FromPrimitive, PartialEq)]
 pub enum IcmPongPacketType {
     Ping,
-    Pong,
+    Ready,
 }
 
 pub struct IcmPongPacket<'a> {
@@ -41,7 +43,7 @@ pub struct IcmPongConnection {
     pub peer: Ipv6Addr,
     tx: TransportSender,
     pub rx: TransportReceiver,
-    client_id: u32,
+    pub client_id: u32,
 }
 
 impl IcmPongConnection {
