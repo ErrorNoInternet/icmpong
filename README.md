@@ -7,7 +7,7 @@ We are basically "using the `ping` command to send data" between two people, ins
 ICMP allows you to include custom data (patterns) within your packets, so we're sending all of our information (ball position, scores, paddle positions, etc) through ICMP.
 
 ### Why ICMPv6 (IPv6)?
-Unlike IPv4, each device gets its own **unique** IPv6 address, which means you can connect directly to your friends without any sort of intermidate server.
+Unlike IPv4, each device gets its own **unique** IPv6 address, which means you can connect directly to your friends without any sort of intermediate server.
 
 ### How can I play?
 Simply run icmpong and supply your friend's IPv6 address (or `fe80::` to play with yourself) via the `-p` flag. Your friend must also supply your IP address.
