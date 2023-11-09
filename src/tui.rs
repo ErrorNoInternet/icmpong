@@ -4,7 +4,6 @@ pub const X_MAXIMUM: u16 = 79;
 pub const Y_MAXIMUM: u16 = 24;
 pub const GAME_TICK_MILLISECONDS: u64 = 15;
 pub const FIELD_SIZE: u16 = X_MAXIMUM * Y_MAXIMUM;
-pub const PIXEL_EMPTY: u8 = b' ';
 
 pub struct GameObject {
     pub x_position: u16,
@@ -49,9 +48,10 @@ pub struct Field {
 impl Field {
     pub fn new() -> Self {
         Self {
-            field_data: [PIXEL_EMPTY; FIELD_SIZE as usize],
+            field_data: [b' '; FIELD_SIZE as usize],
         }
     }
+
     pub fn clear(self: &mut Self) {
         for i in 0..self.field_data.len() {
             let x: u16 = i as u16 % X_MAXIMUM;
@@ -65,7 +65,7 @@ impl Field {
             } else if x == X_MINIMUM || x == X_MAXIMUM - 1 {
                 c = b'|';
             } else {
-                c = PIXEL_EMPTY;
+                c = b' ';
             }
 
             self.field_data[i as usize] = c;
