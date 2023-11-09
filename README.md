@@ -12,7 +12,7 @@ ICMP allows you to include custom data (patterns) within your packets, so we're 
 Unlike IPv4, each device gets its own **unique** IPv6 address, which means you can connect directly to your friends without any sort of intermediate server.
 
 ### How can I play?
-Simply run icmpong and supply your friend's IPv6 address (or `fe80::101` to play with yourself) via the `-p` flag. Your friend must also supply your IPv6 address.
+Simply run icmpong (as root, as it needs to send and capture raw ICMP packets) and supply your friend's IPv6 address (or `fe80::101` to play with yourself) via the `-p` flag. Your friend must also supply your IPv6 address.
 
 ## Compiling
 ```shell
