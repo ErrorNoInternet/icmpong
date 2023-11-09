@@ -298,10 +298,9 @@ fn main() -> anyhow::Result<()> {
             if ball.lock().unwrap().get_ymin() <= Y_MINIMUM
                 || ball.lock().unwrap().get_ymax() >= Y_MAXIMUM
             {
-                bounces += 1;
                 ball.lock().unwrap().y_movement *= -1.0;
                 if self_is_host {
-                    if bounces % 5 == 0 {
+                    if bounces % 5 == 0 && bounces <= 15 {
                         ball.lock().unwrap().x_movement *= 1.1;
                         ball.lock().unwrap().y_movement *= 1.1;
                     }
