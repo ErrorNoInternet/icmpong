@@ -37,7 +37,6 @@ fn main() -> anyhow::Result<()> {
     let ipv6_address = match Ipv6Addr::from_str(&arguments.peer) {
         Ok(ipv6_address) => ipv6_address,
         Err(error) => {
-            cleanup()?;
             eprintln!("unable to parse IPv6 address: {error}");
             return Ok(());
         }
@@ -53,7 +52,6 @@ fn main() -> anyhow::Result<()> {
     let (connection, mut rx) = match IcmPongConnection::new(ipv6_address) {
         Ok((connection, rx)) => (Arc::new(Mutex::new(connection)), rx),
         Err(error) => {
-            cleanup()?;
             eprintln!("unable to create IPv6 socket: {error:?}");
             return Ok(());
         }
@@ -66,7 +64,6 @@ fn main() -> anyhow::Result<()> {
     {
         Ok(_) => (),
         Err(error) => {
-            cleanup()?;
             eprintln!("unable to send Ping packet: {error:?}");
             return Ok(());
         }
@@ -541,6 +538,7 @@ fn connection_loop(
             let packet_client_id = u32::from_ne_bytes(match packet[8..12].try_into() {
                 Ok(packet_client_id) => packet_client_id,
                 Err(error) => {
+                    let _ = cleanup();
                     eprintln!("unable to deserialize peer client id: {error}");
                     return;
                 }
