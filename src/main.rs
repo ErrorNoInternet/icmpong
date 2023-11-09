@@ -134,7 +134,7 @@ fn main() -> anyhow::Result<()> {
     let mut field = Field::new();
     let mut game_started = false;
     let mut round_winner = 0;
-    let mut self_start_game = false;
+    let mut self_started_game = false;
     let mut tick_counter = 0;
     let mut bounces = 0;
 
@@ -180,10 +180,10 @@ fn main() -> anyhow::Result<()> {
                         return Ok(());
                     }
                 }
-                self_start_game = true;
+                self_started_game = true;
             }
 
-            if self_start_game {
+            if self_started_game {
                 if event == Event::Key(KeyCode::Up.into()) {
                     if self_is_host {
                         if player1.lock().unwrap().get_ymin() > Y_MINIMUM + 1 {
@@ -292,6 +292,7 @@ fn main() -> anyhow::Result<()> {
                     round_winner = 2;
                 }
             }
+
             if ball.lock().unwrap().get_ymin() <= Y_MINIMUM
                 || ball.lock().unwrap().get_ymax() >= Y_MAXIMUM
             {
@@ -375,7 +376,7 @@ fn main() -> anyhow::Result<()> {
             field.draw(&player2.lock().unwrap());
 
             if !game_started {
-                if !self_start_game {
+                if !self_started_game {
                     let message = "Press SPACE to start the game!";
                     field.write(
                         X_MAXIMUM / 2 - message.len() as u16 / 2,
@@ -421,38 +422,36 @@ fn main() -> anyhow::Result<()> {
             }
         }
 
-        if round_winner > 0 {
+        if self_is_host && round_winner > 0 {
             score.lock().unwrap()[round_winner - 1] += 1;
             round_winner = 0;
             *ball.lock().unwrap() = GameObject::new(X_MAXIMUM / 2, Y_MAXIMUM / 2, 1, b'O');
-            if self_is_host {
-                bounces = 0;
-                let mut data = [0; 32];
-                data[0..4].copy_from_slice(&score.lock().unwrap()[0].to_ne_bytes());
-                data[4..8].copy_from_slice(&score.lock().unwrap()[1].to_ne_bytes());
-                match connection
-                    .lock()
-                    .unwrap()
-                    .send_packet(IcmPongPacket::new(IcmPongPacketType::ScoreUpdate, &data))
-                {
-                    Ok(_) => (),
-                    Err(error) => {
-                        cleanup()?;
-                        eprintln!("unable to send ScoreUpdate packet: {error:?}");
-                        return Ok(());
-                    }
+            bounces = 0;
+            let mut data = [0; 32];
+            data[0..4].copy_from_slice(&score.lock().unwrap()[0].to_ne_bytes());
+            data[4..8].copy_from_slice(&score.lock().unwrap()[1].to_ne_bytes());
+            match connection
+                .lock()
+                .unwrap()
+                .send_packet(IcmPongPacket::new(IcmPongPacketType::ScoreUpdate, &data))
+            {
+                Ok(_) => (),
+                Err(error) => {
+                    cleanup()?;
+                    eprintln!("unable to send ScoreUpdate packet: {error:?}");
+                    return Ok(());
                 }
+            }
 
-                let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
-                ball.lock().unwrap().x_movement = random_angle.cos() * arguments.ball_velocity;
-                ball.lock().unwrap().y_movement = random_angle.sin() * arguments.ball_velocity;
-                match synchronize_ball(&connection, &ball) {
-                    Ok(_) => (),
-                    Err(error) => {
-                        cleanup()?;
-                        eprintln!("unable to send BallUpdate packet: {error:?}");
-                        return Ok(());
-                    }
+            let random_angle = rand::thread_rng().gen_range(-45..45) as f32;
+            ball.lock().unwrap().x_movement = random_angle.cos() * arguments.ball_velocity;
+            ball.lock().unwrap().y_movement = random_angle.sin() * arguments.ball_velocity;
+            match synchronize_ball(&connection, &ball) {
+                Ok(_) => (),
+                Err(error) => {
+                    cleanup()?;
+                    eprintln!("unable to send BallUpdate packet: {error:?}");
+                    return Ok(());
                 }
             }
         }
