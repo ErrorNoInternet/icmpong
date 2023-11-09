@@ -79,7 +79,10 @@ impl Field {
     pub fn draw(self: &mut Self, game: &GameObject) {
         let x = game.x_position;
         for y in game.get_ymin()..game.get_ymax() {
-            self.field_data[self.get_idx(&x, &y)] = game.pixel;
+            let index = self.get_idx(&x, &y);
+            if self.field_data.len() > index {
+                self.field_data[index] = game.pixel;
+            }
         }
     }
 
